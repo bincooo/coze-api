@@ -171,7 +171,7 @@ func mergeMessages(messages []Message) string {
 
 	join := strings.Join(strings.Split(buf, "\n"), tabs)
 	return fmt.Sprintf(
-		"%s [%s%s\n]\nThe above uses [\"user:\", \"assistant:\"] as text symbols for paragraph segmentation.",
+		"%s [%s%s\n]\nThe above uses [\"user:\", \"assistant:\", \"system\", \"function\"] as text symbols for paragraph segmentation.",
 		sysPrompt, tabs, join)
 }
 

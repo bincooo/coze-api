@@ -6,8 +6,8 @@ import (
 )
 
 const (
-	cookie  = "3fdb9fb39a9bc013049e4315c51f25cb"
-	msToken = "r6UH11oPfA63vnkzTN8wcjbAf6mOM0PceEKihv8OM-rXQnIcRGj0PfGdOGlNiJY34Nrjulk-D56EtGZMwHc4yxZyRjA7QiAQ0LpLeagjeIa1jNr7JM4KLQAPE06TIg"
+	cookie  = "xxx"
+	msToken = "xxx"
 )
 
 func TestChat(t *testing.T) {

@@ -1,8 +1,10 @@
 package coze
 
 import (
+	"context"
 	"strings"
 	"testing"
+	"time"
 )
 
 const (
@@ -35,7 +37,11 @@ func TestChat(t *testing.T) {
 			Content: "摸摸头",
 		},
 	}
-	ch, err := chat.Reply(messages)
+
+	timeout, withTimeout := context.WithTimeout(context.Background(), 120*time.Second)
+	defer withTimeout()
+
+	ch, err := chat.Reply(timeout, messages)
 	if err != nil {
 		t.Fatal(err)
 	}

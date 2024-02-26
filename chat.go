@@ -3,6 +3,7 @@ package coze
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -35,7 +36,7 @@ func New(cookie, msToken string, opts Options) Chat {
 	}
 }
 
-func (c Chat) Reply(messages []Message) (chan string, error) {
+func (c Chat) Reply(ctx context.Context, messages []Message) (chan string, error) {
 	query := mergeMessages(messages)
 
 	conversationId, err := c.getCon()
@@ -67,7 +68,7 @@ func (c Chat) Reply(messages []Message) (chan string, error) {
 	}
 
 	ch := make(chan string)
-	go resolve(response, ch)
+	go resolve(ctx, response, ch)
 	return ch, nil
 }
 
@@ -109,24 +110,25 @@ func (c Chat) getCon() (string, error) {
 	return "", fmt.Errorf("%s", data)
 }
 
-func resolve(response *http.Response, ch chan string) {
+func resolve(ctx context.Context, response *http.Response, ch chan string) {
 	var data []byte
 	before := []byte("data:")
 	defer close(ch)
 
 	r := bufio.NewReader(response.Body)
-	for {
+	// 继续执行返回false
+	Do := func() bool {
 		line, prefix, err := r.ReadLine()
 		if err != nil {
 			if err != io.EOF {
 				ch <- fmt.Sprintf("error: %v", err)
 			}
-			return
+			return true
 		}
 
 		data = append(data, line...)
 		if prefix {
-			continue
+			return false
 		}
 
 		if bytes.HasPrefix(data, before) {
@@ -134,13 +136,13 @@ func resolve(response *http.Response, ch chan string) {
 			data = bytes.TrimPrefix(data, before)
 			if len(data) == 0 {
 				data = nil
-				continue
+				return false
 			}
 
 			err = json.Unmarshal(data, &msg)
 			if err != nil {
 				ch <- fmt.Sprintf("error: %v", err)
-				return
+				return true
 			}
 
 			if msg.Message.Role == "assistant" && msg.Message.Type == "answer" {
@@ -149,6 +151,18 @@ func resolve(response *http.Response, ch chan string) {
 		}
 
 		data = nil
+		return false
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			ch <- fmt.Sprintf("error: context done")
+		default:
+			if stop := Do(); stop {
+				return
+			}
+		}
 	}
 }
 

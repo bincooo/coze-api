@@ -230,7 +230,7 @@ func mergeMessages(messages []Message) string {
 	for _, message := range messages {
 		if lastRole == "" || lastRole != message.Role {
 			lastRole = message.Role
-			buf += fmt.Sprintf("%s: %s%s", message.Role, tabs, strings.Join(strings.Split(message.Content, "\n"), tabs))
+			buf += fmt.Sprintf("\n%s: %s%s", message.Role, tabs, strings.Join(strings.Split(message.Content, "\n"), tabs))
 			continue
 		}
 		buf += fmt.Sprintf("\n%s%s", tabs, strings.Join(strings.Split(message.Content, "\n"), tabs))
@@ -238,7 +238,7 @@ func mergeMessages(messages []Message) string {
 
 	join := strings.Join(strings.Split(buf, "\n"), tabs)
 	return fmt.Sprintf(
-		"%s [%s%s\n]\nThe above uses [\"user:\", \"assistant:\", \"system\", \"function\"] as text symbols for paragraph segmentation.",
+		"%s [%s%s\n\n]\nThe above uses [\"user:\", \"assistant:\", \"system\", \"function\"] as text symbols for paragraph segmentation.",
 		sysPrompt, tabs, join)
 }
 

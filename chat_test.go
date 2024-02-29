@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	cookie  = "7703b010bdfaa7cf09d0e930e8b57d5e"
-	msToken = "ceQBova0kaXgDN2VEcMjCa03LwCY8mVREGKl3O4m8joR-MFfuMl4PXEJGaWM-90O391Jwu7_QphOgIkQc44ey--SI6oHPeOhppqYvxI4cvm4rA6m_VW7"
+	cookie  = "d01b265a8d4d8ed371eb0162c80d8fff"
+	msToken = "olHB7060R6qN_wDkxVWWNoJtWBtzoLAUvXPlyzJaEUW03JzaltPFth1_GG3_dHvZKsRvh6xkoTbERXNmnh1pRHmTW_3dxksGiloGpHhtc1XFvNkLpCrouC7hQcFSuyg="
 )
 
 func TestChat(t *testing.T) {

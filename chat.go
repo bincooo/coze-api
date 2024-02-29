@@ -18,8 +18,10 @@ import (
 
 const (
 	baseURL   = "https://www.coze.com/api/conversation"
+	signUrl   = "https://complete-mmx-coze-helper.hf.space"
 	sysPrompt = "You will play as a gpt-4 with a 128k token, and the following text is information about your historical conversations with the user:"
 	tabs      = "\n    "
+	userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0"
 )
 
 func NewDefaultOptions(botId, version string, scene int, proxies string) Options {
@@ -53,7 +55,7 @@ func (c Chat) Reply(ctx context.Context, messages []Message) (chan string, error
 		"content_type":                "text",
 		"query":                       query,
 		"scene":                       c.opts.scene,
-		"local_message_id":            "VAJm9NkcNfw_" + randHex(9),
+		"local_message_id":            randHex(21),
 		"extra":                       make(map[string]string),
 		"bot_version":                 c.opts.version,
 		"stream":                      true,
@@ -87,7 +89,7 @@ func (c Chat) Reply(ctx context.Context, messages []Message) (chan string, error
 }
 
 func sign(proxies string, msToken string, marshal []byte) (string, string, error) {
-	response, err := fetch(proxies, "https://complete-mmx-coze-helper.hf.space", "", msToken, marshal)
+	response, err := fetch(proxies, signUrl, "", msToken, marshal)
 	if err != nil {
 		return "", "", err
 	}
@@ -257,6 +259,10 @@ func fetch(proxies, route, cookie, msToken string, body []byte) (*http.Response,
 
 	if !strings.HasPrefix(route, "http") {
 		route = baseURL + "/" + route
+	} else {
+		if strings.Contains(route, "127.0.0.1") || strings.Contains(route, "localhost") {
+			client = http.DefaultClient
+		}
 	}
 
 	request, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s?msToken=%s", route, msToken), bytes.NewReader(body))
@@ -265,8 +271,11 @@ func fetch(proxies, route, cookie, msToken string, body []byte) (*http.Response,
 	}
 
 	h := request.Header
-	h.Add("Content-Type", "application/json")
-	h.Add("Cookie", "sessionid="+cookie)
+	h.Add("content-type", "application/json")
+	h.Add("cookie", "sessionid="+cookie)
+	h.Add("userAgent", userAgent)
+	h.Add("origin", "https://www.coze.com")
+	h.Add("referer", "https://www.coze.com/store/bot")
 
 	response, err := client.Do(request)
 	if err != nil {

@@ -8,12 +8,12 @@ import (
 )
 
 const (
-	cookie  = "xxx"
-	msToken = "xxx"
+	cookie  = "7703b010bdfaa7cf09d0e930e8b57d5e"
+	msToken = "ceQBova0kaXgDN2VEcMjCa03LwCY8mVREGKl3O4m8joR-MFfuMl4PXEJGaWM-90O391Jwu7_QphOgIkQc44ey--SI6oHPeOhppqYvxI4cvm4rA6m_VW7"
 )
 
 func TestChat(t *testing.T) {
-	options := NewDefaultOptions("7339624035606904840", 2, "http://127.0.0.1:7890")
+	options := NewDefaultOptions("7339624035606904840", "1708909262893", 2, "http://127.0.0.1:7890")
 	chat := New(cookie, msToken, options)
 	messages := []Message{
 		{

@@ -9,8 +9,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strings"
 )
 
@@ -20,9 +22,10 @@ const (
 	tabs      = "\n    "
 )
 
-func NewDefaultOptions(botId string, scene int, proxies string) Options {
+func NewDefaultOptions(botId, version string, scene int, proxies string) Options {
 	return Options{
 		botId:   botId,
+		version: version,
 		scene:   scene,
 		proxies: proxies,
 	}
@@ -45,12 +48,17 @@ func (c Chat) Reply(ctx context.Context, messages []Message) (chan string, error
 	}
 
 	data := map[string]any{
-		"bot_id":          c.opts.botId,
-		"conversation_id": conversationId,
-		"content_type":    "text",
-		"query":           query,
-		"scene":           c.opts.scene,
-		"stream":          true,
+		"bot_id":                      c.opts.botId,
+		"conversation_id":             conversationId,
+		"content_type":                "text",
+		"query":                       query,
+		"scene":                       c.opts.scene,
+		"local_message_id":            "VAJm9NkcNfw_" + randHex(9),
+		"extra":                       make(map[string]string),
+		"bot_version":                 c.opts.version,
+		"stream":                      true,
+		"chat_history":                make([]int, 0),
+		"insert_history_message_list": make([]int, 0),
 	}
 
 	marshal, err := json.Marshal(data)
@@ -58,7 +66,13 @@ func (c Chat) Reply(ctx context.Context, messages []Message) (chan string, error
 		return nil, err
 	}
 
-	response, err := fetch(c.opts.proxies, "chat", c.cookie, c.msToken, marshal)
+	// 签名
+	bogus, signature, err := sign(c.opts.proxies, c.msToken, marshal)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := fetch(c.opts.proxies, "chat", c.cookie, fmt.Sprintf("%s&X-Bogus=%s&_signature=%s", c.msToken, bogus, signature), marshal)
 	if err != nil {
 		return nil, err
 	}
@@ -70,6 +84,37 @@ func (c Chat) Reply(ctx context.Context, messages []Message) (chan string, error
 	ch := make(chan string)
 	go resolve(ctx, response, ch)
 	return ch, nil
+}
+
+func sign(proxies string, msToken string, marshal []byte) (string, string, error) {
+	response, err := fetch(proxies, "https://complete-mmx-coze-helper.hf.space", "", msToken, marshal)
+	if err != nil {
+		return "", "", err
+	}
+	if response.StatusCode != http.StatusOK {
+		return "", "", errors.New(response.Status)
+	}
+
+	data, err := io.ReadAll(response.Body)
+	if err != nil {
+		return "", "", err
+	}
+
+	var dict map[string]interface{}
+	if err = json.Unmarshal(data, &dict); err != nil {
+		return "", "", err
+	}
+
+	if !reflect.DeepEqual(dict["ok"], true) {
+		return "", "", errors.New(string(data))
+	}
+
+	kv, ok := dict["data"].(map[string]interface{})
+	if !ok {
+		return "", "", errors.New(string(data))
+	}
+
+	return kv["bogus"].(string), kv["signature"].(string), nil
 }
 
 func (c Chat) getCon() (string, error) {
@@ -113,6 +158,7 @@ func (c Chat) getCon() (string, error) {
 func resolve(ctx context.Context, response *http.Response, ch chan string) {
 	var data []byte
 	before := []byte("data:")
+	errorBefore := []byte("{\"code\":")
 	defer close(ch)
 
 	r := bufio.NewReader(response.Body)
@@ -129,6 +175,11 @@ func resolve(ctx context.Context, response *http.Response, ch chan string) {
 		data = append(data, line...)
 		if prefix {
 			return false
+		}
+
+		if bytes.HasPrefix(data, errorBefore) {
+			ch <- fmt.Sprintf("error: %s", data)
+			return true
 		}
 
 		if bytes.HasPrefix(data, before) {
@@ -204,7 +255,11 @@ func fetch(proxies, route, cookie, msToken string, body []byte) (*http.Response,
 		}
 	}
 
-	request, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/%s?msToken=%s", baseURL, route, msToken), bytes.NewReader(body))
+	if !strings.HasPrefix(route, "http") {
+		route = baseURL + "/" + route
+	}
+
+	request, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s?msToken=%s", route, msToken), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -219,4 +274,15 @@ func fetch(proxies, route, cookie, msToken string, body []byte) (*http.Response,
 	}
 
 	return response, nil
+}
+
+func randHex(num int) string {
+	bin := "1234567890abcdefghijklmnopqrstuvwxyz"
+	binL := len(bin)
+
+	var buf []byte
+	for x := 0; x < num; x++ {
+		buf = append(buf, bin[rand.Intn(binL-1)])
+	}
+	return string(buf)
 }

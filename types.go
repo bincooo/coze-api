@@ -8,6 +8,7 @@ type Chat struct {
 
 type Options struct {
 	botId   string // 机器人Id
+	version string // 机器人版本
 	scene   int    // 场景？？
 	proxies string // 本地代理
 }

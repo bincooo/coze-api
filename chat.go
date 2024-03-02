@@ -146,8 +146,6 @@ func (c Chat) Images(ctx context.Context, prompt string) (string, error) {
 		reg, _ := regexp.Compile(`!\[[^]]+]\((https://[^)]+)\)`)
 		if matchList := reg.FindStringSubmatch(message); len(matchList) > 1 {
 			return matchList[1], nil
-		} else {
-			fmt.Println(message)
 		}
 	}
 }

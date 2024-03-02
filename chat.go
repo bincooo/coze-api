@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"regexp"
 	"strings"
 )
 
@@ -86,6 +87,69 @@ func (c Chat) Reply(ctx context.Context, messages []Message) (chan string, error
 	ch := make(chan string)
 	go resolve(ctx, response, ch)
 	return ch, nil
+}
+
+func (c Chat) Images(ctx context.Context, prompt string) (string, error) {
+	conversationId, err := c.getCon()
+	if err != nil {
+		return "", err
+	}
+
+	query := fmt.Sprintf("Paint on command:\n    style: exquisite, HD\n    prompt: %s", prompt)
+	data := map[string]any{
+		"bot_id":                      c.opts.botId,
+		"conversation_id":             conversationId,
+		"content_type":                "text",
+		"query":                       query,
+		"scene":                       c.opts.scene,
+		"local_message_id":            randHex(21),
+		"extra":                       make(map[string]string),
+		"bot_version":                 c.opts.version,
+		"stream":                      true,
+		"chat_history":                make([]int, 0),
+		"insert_history_message_list": make([]int, 0),
+	}
+
+	marshal, err := json.Marshal(data)
+	if err != nil {
+		return "", err
+	}
+
+	// 签名
+	bogus, signature, err := sign(c.opts.proxies, c.msToken, marshal)
+	if err != nil {
+		return "", err
+	}
+
+	response, err := fetch(c.opts.proxies, "chat", c.cookie, fmt.Sprintf("%s&X-Bogus=%s&_signature=%s", c.msToken, bogus, signature), marshal)
+	if err != nil {
+		return "", err
+	}
+
+	if response.StatusCode != http.StatusOK {
+		return "", errors.New(response.Status)
+	}
+
+	ch := make(chan string)
+	go resolve(ctx, response, ch)
+
+	for {
+		message, ok := <-ch
+		if !ok {
+			return "", errors.New("paint failed")
+		}
+
+		if strings.HasPrefix(message, "error: ") {
+			return "", errors.New(strings.TrimPrefix(message, "error: "))
+		}
+
+		reg, _ := regexp.Compile(`!\[[^]]+]\((https://[^)]+)\)`)
+		if matchList := reg.FindStringSubmatch(message); len(matchList) > 1 {
+			return matchList[1], nil
+		} else {
+			fmt.Println(message)
+		}
+	}
 }
 
 func sign(proxies string, msToken string, marshal []byte) (string, string, error) {
@@ -198,8 +262,18 @@ func resolve(ctx context.Context, response *http.Response, ch chan string) {
 				return true
 			}
 
-			if msg.Message.Role == "assistant" && msg.Message.Type == "answer" {
-				ch <- fmt.Sprintf("text: %s", msg.Message.Content)
+			if msg.Message.Role == "assistant" {
+				if msg.Message.Type == "answer" {
+					if strings.Contains(msg.Message.Content, "limit on the number of messages") {
+						ch <- fmt.Sprintf("error: %v", msg.Message.Content)
+						return true
+					}
+					ch <- fmt.Sprintf("text: %s", msg.Message.Content)
+				}
+				if msg.Message.Type == "tool_response" && strings.HasPrefix(msg.Message.Content, "Failed:") {
+					ch <- fmt.Sprintf("error: %v", msg.Message.Content)
+					return true
+				}
 			}
 		}
 

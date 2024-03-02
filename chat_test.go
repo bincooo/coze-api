@@ -8,12 +8,12 @@ import (
 )
 
 const (
-	cookie  = "d01b265a8d4d8ed371eb0162c80d8fff"
-	msToken = "olHB7060R6qN_wDkxVWWNoJtWBtzoLAUvXPlyzJaEUW03JzaltPFth1_GG3_dHvZKsRvh6xkoTbERXNmnh1pRHmTW_3dxksGiloGpHhtc1XFvNkLpCrouC7hQcFSuyg="
+	cookie  = "xxx"
+	msToken = "xxx"
 )
 
 func TestChat(t *testing.T) {
-	options := NewDefaultOptions("7339624035606904840", "1708909262893", 2, "http://127.0.0.1:7890")
+	options := NewDefaultOptions("7339624035606904840", "1709391847426", 2, "http://127.0.0.1:7890")
 	chat := New(cookie, msToken, options)
 	messages := []Message{
 		{
@@ -34,7 +34,7 @@ func TestChat(t *testing.T) {
 		},
 		{
 			Role:    "user",
-			Content: "摸摸头",
+			Content: "画一个猫娘",
 		},
 	}
 
@@ -47,6 +47,20 @@ func TestChat(t *testing.T) {
 	}
 
 	echo(ch, t)
+}
+
+func TestImages(t *testing.T) {
+	options := NewDefaultOptions("7338032064396214278", "1708525794004", 2, "http://127.0.0.1:7890")
+	chat := New(cookie, msToken, options)
+	timeout, withTimeout := context.WithTimeout(context.Background(), 120*time.Second)
+	defer withTimeout()
+
+	image, err := chat.Images(timeout, "画一个二次元猫娘，1girl")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log(image)
 }
 
 func echo(ch chan string, t *testing.T) {

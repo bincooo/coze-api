@@ -19,6 +19,9 @@ type Message struct {
 }
 
 type resMessage struct {
+	MessageId string `json:"message_id"`
+	ReplyId   string `json:"reply_id"`
+
 	Message struct {
 		Role    string `json:"role"`
 		Type    string `json:"type"`

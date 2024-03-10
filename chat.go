@@ -8,8 +8,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"golang.org/x/net/proxy"
 	"io"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -315,26 +317,17 @@ func mergeMessages(messages []Message) string {
 }
 
 func fetch(proxies, route, cookie, msToken string, body []byte) (*http.Response, error) {
-	client := http.DefaultClient
-	if proxies != "" {
-		client = &http.Client{
-			Transport: &http.Transport{
-				Proxy: func(req *http.Request) (*url.URL, error) {
-					return url.Parse(proxies)
-				},
-				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: true,
-				},
-			},
-		}
-	}
-
 	if !strings.HasPrefix(route, "http") {
 		route = baseURL + "/" + route
 	} else {
 		if strings.Contains(route, "127.0.0.1") || strings.Contains(route, "localhost") {
-			client = http.DefaultClient
+			proxies = ""
 		}
+	}
+
+	client, err := newClient(proxies)
+	if err != nil {
+		return nil, err
 	}
 
 	request, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s?msToken=%s", route, msToken), bytes.NewReader(body))
@@ -366,4 +359,45 @@ func randHex(num int) string {
 		buf = append(buf, bin[rand.Intn(binL-1)])
 	}
 	return string(buf)
+}
+
+func newClient(proxies string) (*http.Client, error) {
+	client := http.DefaultClient
+	if proxies != "" {
+		proxiesUrl, err := url.Parse(proxies)
+		if err != nil {
+			return nil, err
+		}
+
+		if proxiesUrl.Scheme == "http" || proxiesUrl.Scheme == "https" {
+			client = &http.Client{
+				Transport: &http.Transport{
+					Proxy: http.ProxyURL(proxiesUrl),
+					TLSClientConfig: &tls.Config{
+						InsecureSkipVerify: true,
+					},
+				},
+			}
+		}
+
+		// socks5://127.0.0.1:7890
+		if proxiesUrl.Scheme == "socks5" {
+			client = &http.Client{
+				Transport: &http.Transport{
+					DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+						dialer, e := proxy.SOCKS5("tcp", proxiesUrl.Host, nil, proxy.Direct)
+						if e != nil {
+							return nil, e
+						}
+						return dialer.Dial(network, addr)
+					},
+					TLSClientConfig: &tls.Config{
+						InsecureSkipVerify: true,
+					},
+				},
+			}
+		}
+	}
+
+	return client, nil
 }

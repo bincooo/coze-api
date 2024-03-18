@@ -284,7 +284,8 @@ func resolve(ctx context.Context, response *http.Response, ch chan string) {
 	for {
 		select {
 		case <-ctx.Done():
-			ch <- fmt.Sprintf("error: context done")
+			ch <- "error: context done"
+			return
 		default:
 			if stop := Do(); stop {
 				return
@@ -338,7 +339,7 @@ func fetch(proxies, route, cookie, msToken string, body []byte) (*http.Response,
 	h := request.Header
 	h.Add("content-type", "application/json")
 	h.Add("cookie", "sessionid="+cookie)
-	h.Add("userAgent", userAgent)
+	h.Add("user-agent", userAgent)
 	h.Add("origin", "https://www.coze.com")
 	h.Add("referer", "https://www.coze.com/store/bot")
 

@@ -44,9 +44,7 @@ func New(cookie, msToken string, opts Options) Chat {
 	}
 }
 
-func (c Chat) Reply(ctx context.Context, messages []Message) (chan string, error) {
-	query := mergeMessages(messages)
-
+func (c Chat) Reply(ctx context.Context, query string) (chan string, error) {
 	conversationId, err := c.getCon()
 	if err != nil {
 		return nil, err
@@ -294,7 +292,7 @@ func resolve(ctx context.Context, response *http.Response, ch chan string) {
 	}
 }
 
-func mergeMessages(messages []Message) string {
+func MergeMessages(messages []Message) string {
 	if len(messages) == 0 {
 		return ""
 	}

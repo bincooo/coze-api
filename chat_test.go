@@ -41,7 +41,7 @@ func TestChat(t *testing.T) {
 	timeout, withTimeout := context.WithTimeout(context.Background(), 120*time.Second)
 	defer withTimeout()
 
-	ch, err := chat.Reply(timeout, messages)
+	ch, err := chat.Reply(timeout, MergeMessages(messages))
 	if err != nil {
 		t.Fatal(err)
 	}

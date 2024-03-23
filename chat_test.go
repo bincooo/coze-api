@@ -50,7 +50,7 @@ func TestChat(t *testing.T) {
 }
 
 func TestImages(t *testing.T) {
-	options := NewDefaultOptions("7338032064396214278", "1708525794004", 2, "http://127.0.0.1:7890")
+	options := NewDefaultOptions("7349524440562090002", "1711195961118", 2, "http://127.0.0.1:7890")
 	chat := New(cookie, msToken, options)
 	timeout, withTimeout := context.WithTimeout(context.Background(), 120*time.Second)
 	defer withTimeout()

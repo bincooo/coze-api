@@ -22,7 +22,7 @@ import (
 const (
 	baseURL   = "https://www.coze.com/api/conversation"
 	signUrl   = "https://complete-mmx-coze-helper.hf.space"
-	sysPrompt = "You will play as a gpt-4 with a 128k token, and the following text is information about your historical conversations with the user:"
+	sysPrompt = "[Start New Conversation]\nYou will play as a gpt-4 with a 128k token, and the following text is information about your historical conversations with the user:"
 	tabs      = "\n    "
 	userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0"
 )
@@ -85,7 +85,7 @@ func (c Chat) Reply(ctx context.Context, query string) (chan string, error) {
 	}
 
 	ch := make(chan string)
-	go resolve(ctx, response, ch)
+	go c.resolve(ctx, conversationId, response, ch)
 	return ch, nil
 }
 
@@ -131,7 +131,7 @@ func (c Chat) Images(ctx context.Context, prompt string) (string, error) {
 	}
 
 	ch := make(chan string)
-	go resolve(ctx, response, ch)
+	go c.resolve(ctx, conversationId, response, ch)
 
 	for {
 		message, ok := <-ch
@@ -219,11 +219,48 @@ func (c Chat) getCon() (string, error) {
 	return "", fmt.Errorf("%s", data)
 }
 
-func resolve(ctx context.Context, response *http.Response, ch chan string) {
+func (c Chat) delCon(conversationId string) {
+	if conversationId == "" {
+		return
+	}
+
+	marshal, err := json.Marshal(map[string]any{
+		"conversation_id": conversationId,
+		"scene":           c.opts.scene,
+	})
+	if err != nil {
+		fmt.Printf("delCon [%s] failed\n", conversationId)
+		return
+	}
+
+	// 签名
+	//bogus, signature, err := sign(c.opts.proxies, c.msToken, marshal)
+	//if err != nil {
+	//	return "", err
+	//}
+	//fmt.Sprintf("%s&X-Bogus=%s&_signature=%s", c.msToken, bogus, signature)
+
+	response, err := fetch(c.opts.proxies, "clear_message", c.cookie, c.msToken, marshal)
+	if err != nil {
+		fmt.Printf("delCon [%s] failed: %v\n", conversationId, err)
+		return
+	}
+
+	if response.StatusCode != http.StatusOK {
+		fmt.Printf("delCon [%s] failed: %s\n", conversationId, response.Status)
+		return
+	}
+
+	data, _ := io.ReadAll(response.Body)
+	fmt.Printf("%s\n", data)
+}
+
+func (c Chat) resolve(ctx context.Context, conversationId string, response *http.Response, ch chan string) {
 	var data []byte
 	before := []byte("data:")
 	errorBefore := []byte("{\"code\":")
 	defer close(ch)
+	defer c.delCon(conversationId)
 
 	r := bufio.NewReader(response.Body)
 	// 继续执行返回false

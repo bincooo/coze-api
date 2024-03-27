@@ -28,3 +28,8 @@ type resMessage struct {
 		Content string `json:"content"`
 	} `json:"message"`
 }
+
+type signResponse[T any] struct {
+	Ok   bool
+	Data T
+}

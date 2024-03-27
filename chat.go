@@ -4,27 +4,26 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"golang.org/x/net/proxy"
+	"github.com/bincooo/coze-api/common"
 	"io"
 	"math/rand"
-	"net"
 	"net/http"
-	"net/url"
-	"reflect"
 	"regexp"
 	"strings"
 )
 
 const (
-	baseURL   = "https://www.coze.com/api/conversation"
-	signUrl   = "https://complete-mmx-coze-helper.hf.space"
 	sysPrompt = "[Start New Conversation]\nYou will play as a gpt-4 with a 128k token, and the following text is information about your historical conversations with the user:"
 	tabs      = "\n    "
 	userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0"
+)
+
+var (
+	BaseURL = "https://www.coze.com/api/conversation"
+	SignURL = "https://complete-mmx-coze-helper.hf.space"
 )
 
 func NewDefaultOptions(botId, version string, scene int, proxies string) Options {
@@ -36,21 +35,28 @@ func NewDefaultOptions(botId, version string, scene int, proxies string) Options
 	}
 }
 
-func New(cookie, msToken string, opts Options) Chat {
+func New(cookie string, opts Options) Chat {
 	return Chat{
-		cookie:  cookie,
-		msToken: msToken,
-		opts:    opts,
+		cookie: cookie,
+		opts:   opts,
 	}
 }
 
-func (c Chat) Reply(ctx context.Context, query string) (chan string, error) {
+func (c *Chat) Reply(ctx context.Context, query string) (chan string, error) {
+	if c.msToken == "" {
+		msToken, err := c.reportMsToken()
+		if err != nil {
+			return nil, err
+		}
+		c.msToken = msToken
+	}
+
 	conversationId, err := c.getCon()
 	if err != nil {
 		return nil, err
 	}
 
-	data := map[string]any{
+	data := map[string]interface{}{
 		"bot_id":                      c.opts.botId,
 		"conversation_id":             conversationId,
 		"content_type":                "text",
@@ -64,18 +70,26 @@ func (c Chat) Reply(ctx context.Context, query string) (chan string, error) {
 		"insert_history_message_list": make([]int, 0),
 	}
 
-	marshal, err := json.Marshal(data)
-	if err != nil {
-		return nil, err
-	}
-
 	// 签名
-	bogus, signature, err := sign(c.opts.proxies, c.msToken, marshal)
+	bogus, signature, err := sign(c.opts.proxies, c.msToken, data)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := fetch(c.opts.proxies, "chat", c.cookie, fmt.Sprintf("%s&X-Bogus=%s&_signature=%s", c.msToken, bogus, signature), marshal)
+	response, err := common.New().
+		Proxies(c.opts.proxies).
+		Method(http.MethodPost).
+		URL(fmt.Sprintf("%s/chat", BaseURL)).
+		Query("msToken", c.msToken).
+		Query("X-Bogus", bogus).
+		Query("_signature", signature).
+		Header("user-agent", userAgent).
+		Header("cookie", "sessionid="+c.cookie).
+		Header("origin", "https://www.coze.com").
+		Header("referer", "https://www.coze.com/store/bot").
+		JsonHeader().
+		SetBody(data).
+		Do()
 	if err != nil {
 		return nil, err
 	}
@@ -89,14 +103,14 @@ func (c Chat) Reply(ctx context.Context, query string) (chan string, error) {
 	return ch, nil
 }
 
-func (c Chat) Images(ctx context.Context, prompt string) (string, error) {
+func (c *Chat) Images(ctx context.Context, prompt string) (string, error) {
 	conversationId, err := c.getCon()
 	if err != nil {
 		return "", err
 	}
 
 	query := fmt.Sprintf("Paint on command:\n    style: exquisite, HD\n    prompt: %s", prompt)
-	data := map[string]any{
+	data := map[string]interface{}{
 		"bot_id":                      c.opts.botId,
 		"conversation_id":             conversationId,
 		"content_type":                "text",
@@ -110,18 +124,26 @@ func (c Chat) Images(ctx context.Context, prompt string) (string, error) {
 		"insert_history_message_list": make([]int, 0),
 	}
 
-	marshal, err := json.Marshal(data)
-	if err != nil {
-		return "", err
-	}
-
 	// 签名
-	bogus, signature, err := sign(c.opts.proxies, c.msToken, marshal)
+	bogus, signature, err := sign(c.opts.proxies, c.msToken, data)
 	if err != nil {
 		return "", err
 	}
 
-	response, err := fetch(c.opts.proxies, "chat", c.cookie, fmt.Sprintf("%s&X-Bogus=%s&_signature=%s", c.msToken, bogus, signature), marshal)
+	response, err := common.New().
+		Proxies(c.opts.proxies).
+		Method(http.MethodPost).
+		URL(fmt.Sprintf("%s/chat", BaseURL)).
+		Query("msToken", c.msToken).
+		Query("X-Bogus", bogus).
+		Query("_signature", signature).
+		Header("user-agent", userAgent).
+		Header("cookie", "sessionid="+c.cookie).
+		Header("origin", "https://www.coze.com").
+		Header("referer", "https://www.coze.com/store/bot").
+		JsonHeader().
+		SetBody(data).
+		Do()
 	if err != nil {
 		return "", err
 	}
@@ -150,49 +172,40 @@ func (c Chat) Images(ctx context.Context, prompt string) (string, error) {
 	}
 }
 
-func sign(proxies string, msToken string, marshal []byte) (string, string, error) {
-	response, err := fetch(proxies, signUrl, "", msToken, marshal)
+func sign(proxies string, msToken string, payload interface{}) (string, string, error) {
+	response, err := common.New().
+		Proxies(proxies).
+		Method(http.MethodPost).
+		URL(SignURL).
+		Query("msToken", msToken).
+		JsonHeader().
+		SetBody(payload).
+		Do()
 	if err != nil {
-		return "", "", err
+		return "", "", fmt.Errorf("coze-sign: %v", err)
 	}
+
 	if response.StatusCode != http.StatusOK {
-		return "", "", errors.New(response.Status)
+		return "", "", fmt.Errorf("coze-sign: %s", response.Status)
 	}
 
-	data, err := io.ReadAll(response.Body)
-	if err != nil {
-		return "", "", err
+	var res signResponse[map[string]interface{}]
+	if err = common.ToObj(response, &res); err != nil {
+		return "", "", fmt.Errorf("coze-sign: %s", err)
 	}
 
-	var dict map[string]interface{}
-	if err = json.Unmarshal(data, &dict); err != nil {
-		return "", "", err
+	if !res.Ok {
+		return "", "", fmt.Errorf("coze-sign: %s", res.Data)
 	}
 
-	if !reflect.DeepEqual(dict["ok"], true) {
-		return "", "", errors.New(string(data))
-	}
-
-	kv, ok := dict["data"].(map[string]interface{})
-	if !ok {
-		return "", "", errors.New(string(data))
-	}
-
-	return kv["bogus"].(string), kv["signature"].(string), nil
+	return res.Data["bogus"].(string), res.Data["signature"].(string), nil
 }
 
-func (c Chat) getCon() (string, error) {
-	obj := map[string]any{
-		"bot_id": c.opts.botId,
-		"scene":  c.opts.scene,
-	}
-
-	marshal, err := json.Marshal(obj)
-	if err != nil {
-		return "", err
-	}
-
-	response, err := fetch(c.opts.proxies, "get_conversation", c.cookie, c.msToken, marshal)
+func (c *Chat) reportMsToken() (string, error) {
+	response, err := common.New().
+		Proxies(c.opts.proxies).
+		URL(SignURL + "/report").
+		Do()
 	if err != nil {
 		return "", err
 	}
@@ -201,12 +214,74 @@ func (c Chat) getCon() (string, error) {
 		return "", errors.New(response.Status)
 	}
 
-	var dict map[string]interface{}
+	var res signResponse[map[string]interface{}]
+	if err = common.ToObj(response, &res); err != nil {
+		return "", err
+	}
+
+	if !res.Ok {
+		return "", errors.New("refresh msToken failed")
+	}
+
+	response, err = common.New().
+		Proxies(c.opts.proxies).
+		Method(http.MethodPost).
+		URL(fmt.Sprintf("%s/web/report", res.Data["url"])).
+		Query("msToken", c.msToken).
+		Header("user-agent", userAgent).
+		Header("cookie", "sessionid="+c.cookie).
+		Header("origin", "https://www.coze.com").
+		Header("referer", "https://www.coze.com/store/bot").
+		JsonHeader().
+		SetBody(res.Data).
+		Do()
+	if err != nil {
+		return "", err
+	}
+
+	if response.StatusCode != http.StatusOK {
+		return "", errors.New(response.Status)
+	}
+
+	cookie := common.GetCookie(response, "msToken")
+	if cookie == "" {
+		return cookie, errors.New("refresh msToken failed")
+	}
+	return cookie, nil
+}
+
+func (c *Chat) getCon() (string, error) {
+	obj := map[string]interface{}{
+		"bot_id": c.opts.botId,
+		"scene":  c.opts.scene,
+	}
+
+	response, err := common.New().
+		Proxies(c.opts.proxies).
+		Method(http.MethodPost).
+		URL(fmt.Sprintf("%s/get_conversation", BaseURL)).
+		Query("msToken", c.msToken).
+		Header("user-agent", userAgent).
+		Header("cookie", "sessionid="+c.cookie).
+		Header("origin", "https://www.coze.com").
+		Header("referer", "https://www.coze.com/store/bot").
+		JsonHeader().
+		SetBody(obj).
+		Do()
+	if err != nil {
+		return "", err
+	}
+
+	if response.StatusCode != http.StatusOK {
+		return "", errors.New(response.Status)
+	}
+
 	data, err := io.ReadAll(response.Body)
 	if err != nil {
 		return "", err
 	}
 
+	var dict map[string]interface{}
 	err = json.Unmarshal(data, &dict)
 	if err != nil {
 		return "", err
@@ -219,28 +294,27 @@ func (c Chat) getCon() (string, error) {
 	return "", fmt.Errorf("%s", data)
 }
 
-func (c Chat) delCon(conversationId string) {
+func (c *Chat) delCon(conversationId string) {
 	if conversationId == "" {
 		return
 	}
 
-	marshal, err := json.Marshal(map[string]any{
-		"conversation_id": conversationId,
-		"scene":           c.opts.scene,
-	})
-	if err != nil {
-		fmt.Printf("delCon [%s] failed\n", conversationId)
-		return
-	}
-
-	// 签名
-	//bogus, signature, err := sign(c.opts.proxies, c.msToken, marshal)
-	//if err != nil {
-	//	return "", err
-	//}
-	//fmt.Sprintf("%s&X-Bogus=%s&_signature=%s", c.msToken, bogus, signature)
-
-	response, err := fetch(c.opts.proxies, "clear_message", c.cookie, c.msToken, marshal)
+	response, err := common.New().
+		Proxies(c.opts.proxies).
+		Method(http.MethodPost).
+		URL(fmt.Sprintf("%s/clear_message", BaseURL)).
+		Query("msToken", c.msToken).
+		Header("user-agent", userAgent).
+		Header("cookie", "sessionid="+c.cookie).
+		Header("origin", "https://www.coze.com").
+		Header("referer", "https://www.coze.com/store/bot").
+		JsonHeader().
+		SetBody(map[string]any{
+			"bot_id":          c.opts.botId,
+			"conversation_id": conversationId,
+			"scene":           c.opts.scene,
+		}).
+		Do()
 	if err != nil {
 		fmt.Printf("delCon [%s] failed: %v\n", conversationId, err)
 		return
@@ -255,7 +329,7 @@ func (c Chat) delCon(conversationId string) {
 	fmt.Printf("%s\n", data)
 }
 
-func (c Chat) resolve(ctx context.Context, conversationId string, response *http.Response, ch chan string) {
+func (c *Chat) resolve(ctx context.Context, conversationId string, response *http.Response, ch chan string) {
 	var data []byte
 	before := []byte("data:")
 	errorBefore := []byte("{\"code\":")
@@ -352,40 +426,6 @@ func MergeMessages(messages []Message) string {
 		sysPrompt, tabs, join)
 }
 
-func fetch(proxies, route, cookie, msToken string, body []byte) (*http.Response, error) {
-	if !strings.HasPrefix(route, "http") {
-		route = baseURL + "/" + route
-	} else {
-		if strings.Contains(route, "127.0.0.1") || strings.Contains(route, "localhost") {
-			proxies = ""
-		}
-	}
-
-	client, err := newClient(proxies)
-	if err != nil {
-		return nil, err
-	}
-
-	request, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s?msToken=%s", route, msToken), bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-
-	h := request.Header
-	h.Add("content-type", "application/json")
-	h.Add("cookie", "sessionid="+cookie)
-	h.Add("user-agent", userAgent)
-	h.Add("origin", "https://www.coze.com")
-	h.Add("referer", "https://www.coze.com/store/bot")
-
-	response, err := client.Do(request)
-	if err != nil {
-		return nil, err
-	}
-
-	return response, nil
-}
-
 func randHex(num int) string {
 	bin := "1234567890abcdefghijklmnopqrstuvwxyz"
 	binL := len(bin)
@@ -395,45 +435,4 @@ func randHex(num int) string {
 		buf = append(buf, bin[rand.Intn(binL-1)])
 	}
 	return string(buf)
-}
-
-func newClient(proxies string) (*http.Client, error) {
-	client := http.DefaultClient
-	if proxies != "" {
-		proxiesUrl, err := url.Parse(proxies)
-		if err != nil {
-			return nil, err
-		}
-
-		if proxiesUrl.Scheme == "http" || proxiesUrl.Scheme == "https" {
-			client = &http.Client{
-				Transport: &http.Transport{
-					Proxy: http.ProxyURL(proxiesUrl),
-					TLSClientConfig: &tls.Config{
-						InsecureSkipVerify: true,
-					},
-				},
-			}
-		}
-
-		// socks5://127.0.0.1:7890
-		if proxiesUrl.Scheme == "socks5" {
-			client = &http.Client{
-				Transport: &http.Transport{
-					DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-						dialer, e := proxy.SOCKS5("tcp", proxiesUrl.Host, nil, proxy.Direct)
-						if e != nil {
-							return nil, e
-						}
-						return dialer.Dial(network, addr)
-					},
-					TLSClientConfig: &tls.Config{
-						InsecureSkipVerify: true,
-					},
-				},
-			}
-		}
-	}
-
-	return client, nil
 }

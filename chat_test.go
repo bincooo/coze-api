@@ -13,8 +13,8 @@ const (
 )
 
 func TestChat(t *testing.T) {
-	options := NewDefaultOptions("7339624035606904840", "1709391847426", 2, "http://127.0.0.1:7890")
-	chat := New(cookie, msToken, options)
+	options := NewDefaultOptions("7339624035606904840", "1711450454581", 2, "http://127.0.0.1:7890")
+	chat := New(cookie, options)
 	messages := []Message{
 		{
 			Role:    "user",
@@ -34,7 +34,7 @@ func TestChat(t *testing.T) {
 		},
 		{
 			Role:    "user",
-			Content: "画一个猫娘",
+			Content: "1+1=?",
 		},
 	}
 
@@ -51,7 +51,7 @@ func TestChat(t *testing.T) {
 
 func TestImages(t *testing.T) {
 	options := NewDefaultOptions("7349524440562090002", "1711195961118", 2, "http://127.0.0.1:7890")
-	chat := New(cookie, msToken, options)
+	chat := New(cookie, options)
 	timeout, withTimeout := context.WithTimeout(context.Background(), 120*time.Second)
 	defer withTimeout()
 

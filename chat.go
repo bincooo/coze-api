@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 )
 
 const (
@@ -56,20 +57,7 @@ func (c *Chat) Reply(ctx context.Context, query string) (chan string, error) {
 		return nil, err
 	}
 
-	data := map[string]interface{}{
-		"bot_id":                      c.opts.botId,
-		"conversation_id":             conversationId,
-		"content_type":                "text",
-		"query":                       query,
-		"scene":                       c.opts.scene,
-		"local_message_id":            randHex(21),
-		"extra":                       make(map[string]string),
-		"bot_version":                 c.opts.version,
-		"stream":                      true,
-		"chat_history":                make([]int, 0),
-		"insert_history_message_list": make([]int, 0),
-	}
-
+	data := c.makeData(conversationId, query)
 	// 签名
 	bogus, signature, err := sign(c.opts.proxies, c.msToken, data)
 	if err != nil {
@@ -110,19 +98,7 @@ func (c *Chat) Images(ctx context.Context, prompt string) (string, error) {
 	}
 
 	query := fmt.Sprintf("Paint on command:\n    style: exquisite, HD\n    prompt: %s", prompt)
-	data := map[string]interface{}{
-		"bot_id":                      c.opts.botId,
-		"conversation_id":             conversationId,
-		"content_type":                "text",
-		"query":                       query,
-		"scene":                       c.opts.scene,
-		"local_message_id":            randHex(21),
-		"extra":                       make(map[string]string),
-		"bot_version":                 c.opts.version,
-		"stream":                      true,
-		"chat_history":                make([]int, 0),
-		"insert_history_message_list": make([]int, 0),
-	}
+	data := c.makeData(conversationId, query)
 
 	// 签名
 	bogus, signature, err := sign(c.opts.proxies, c.msToken, data)
@@ -172,6 +148,25 @@ func (c *Chat) Images(ctx context.Context, prompt string) (string, error) {
 	}
 }
 
+func (c *Chat) makeData(conversationId string, query string) map[string]interface{} {
+	data := map[string]interface{}{
+		"bot_id":                      c.opts.botId,
+		"conversation_id":             conversationId,
+		"content_type":                "text",
+		"query":                       query,
+		"scene":                       c.opts.scene,
+		"local_message_id":            randHex(21),
+		"extra":                       make(map[string]string),
+		"bot_version":                 c.opts.version,
+		"device_id":                   randDID(),
+		"draft_mode":                  false,
+		"stream":                      true,
+		"chat_history":                make([]int, 0),
+		"insert_history_message_list": make([]int, 0),
+	}
+	return data
+}
+
 func sign(proxies string, msToken string, payload interface{}) (string, string, error) {
 	response, err := common.New().
 		Proxies(proxies).
@@ -198,7 +193,10 @@ func sign(proxies string, msToken string, payload interface{}) (string, string, 
 		return "", "", fmt.Errorf("coze-sign: %s", res.Data)
 	}
 
-	return res.Data["bogus"].(string), res.Data["signature"].(string), nil
+	bogus := res.Data["bogus"].(string)
+	signature := res.Data["signature"].(string)
+	// fmt.Printf("sign success: bogus [%s], signature[%s]\n", bogus, signature)
+	return bogus, signature, nil
 }
 
 func (c *Chat) reportMsToken() (string, error) {
@@ -247,6 +245,7 @@ func (c *Chat) reportMsToken() (string, error) {
 	if cookie == "" {
 		return cookie, errors.New("refresh msToken failed")
 	}
+	// fmt.Printf("msToken success: %s\n", cookie)
 	return cookie, nil
 }
 
@@ -373,7 +372,7 @@ func (c *Chat) resolve(ctx context.Context, conversationId string, response *htt
 
 			if msg.Message.Role == "assistant" {
 				if msg.Message.Type == "answer" {
-					if strings.Contains(msg.Message.Content, "limit on the number of messages") {
+					if IsLimit(msg.Message.Content) {
 						ch <- fmt.Sprintf("error: %v", msg.Message.Content)
 						return true
 					}
@@ -403,6 +402,16 @@ func (c *Chat) resolve(ctx context.Context, conversationId string, response *htt
 	}
 }
 
+func IsLimit(content string) bool {
+	if strings.Contains(content, "limit on the number of messages") {
+		return true
+	}
+	if strings.Contains(content, "daily limit for sending messages") {
+		return true
+	}
+	return false
+}
+
 func MergeMessages(messages []Message) string {
 	if len(messages) == 0 {
 		return ""
@@ -426,8 +435,12 @@ func MergeMessages(messages []Message) string {
 		sysPrompt, tabs, join)
 }
 
+func randDID() string {
+	return fmt.Sprintf("%d", int64(rand.Intn(999999999))+time.Now().Unix())
+}
+
 func randHex(num int) string {
-	bin := "1234567890abcdefghijklmnopqrstuvwxyz"
+	bin := "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_"
 	binL := len(bin)
 
 	var buf []byte

@@ -3,6 +3,7 @@ package coze
 import (
 	"context"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -11,6 +12,19 @@ const (
 	cookie  = "xxx"
 	msToken = "xxx"
 )
+
+func TestChats(t *testing.T) {
+	var wg sync.WaitGroup
+	wg.Add(20)
+	for i := 0; i < 20; i++ {
+		go func() {
+			TestChat(t)
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+	t.Log("finish")
+}
 
 func TestChat(t *testing.T) {
 	options := NewDefaultOptions("7339624035606904840", "1711450454581", 2, "http://127.0.0.1:7890")
@@ -70,7 +84,7 @@ func echo(ch chan string, t *testing.T) {
 			return
 		}
 
-		if strings.HasPrefix(message, "error: ") {
+		if strings.HasPrefix(message, "error:") {
 			t.Fatal(message)
 		}
 

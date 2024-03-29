@@ -23,6 +23,7 @@ type R struct {
 	query   []string
 	bytes   []byte
 	err     error
+	ctx     context.Context
 }
 
 func New() *R {
@@ -45,6 +46,11 @@ func (r *R) Method(method string) *R {
 
 func (r *R) Proxies(proxies string) *R {
 	r.proxies = proxies
+	return r
+}
+
+func (r *R) Context(ctx context.Context) *R {
+	r.ctx = ctx
 	return r
 }
 
@@ -106,6 +112,10 @@ func (r *R) Do() (*http.Response, error) {
 	h := request.Header
 	for k, v := range r.headers {
 		h.Add(k, v)
+	}
+
+	if r.ctx != nil {
+		request = request.WithContext(r.ctx)
 	}
 
 	response, err := c.Do(request)

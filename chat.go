@@ -65,6 +65,7 @@ func (c *Chat) Reply(ctx context.Context, query string) (chan string, error) {
 	}
 
 	response, err := common.New().
+		Context(ctx).
 		Proxies(c.opts.proxies).
 		Method(http.MethodPost).
 		URL(fmt.Sprintf("%s/chat", BaseURL)).
@@ -107,6 +108,7 @@ func (c *Chat) Images(ctx context.Context, prompt string) (string, error) {
 	}
 
 	response, err := common.New().
+		Context(ctx).
 		Proxies(c.opts.proxies).
 		Method(http.MethodPost).
 		URL(fmt.Sprintf("%s/chat", BaseURL)).
@@ -431,7 +433,7 @@ func MergeMessages(messages []Message) string {
 
 	join := strings.Join(strings.Split(buf, "\n"), tabs)
 	return fmt.Sprintf(
-		"%s [%s%s\n\n]\nThe above uses [\"user:\", \"assistant:\", \"system\", \"function\"] as text symbols for paragraph segmentation.",
+		"%s \n--Start--%s%s\n\n--End--\nThe above uses [\"user:\", \"assistant:\", \"system:\", \"function:\"] as text symbols for paragraph segmentation, Please do not output separator prefixes.",
 		sysPrompt, tabs, join)
 }
 

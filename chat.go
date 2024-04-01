@@ -36,10 +36,11 @@ func NewDefaultOptions(botId, version string, scene int, proxies string) Options
 	}
 }
 
-func New(cookie string, opts Options) Chat {
+func New(cookie, msToken string, opts Options) Chat {
 	return Chat{
-		cookie: cookie,
-		opts:   opts,
+		cookie:  cookie,
+		msToken: msToken,
+		opts:    opts,
 	}
 }
 

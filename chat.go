@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	sysPrompt = "[Start New Conversation]\nYou will play as a gpt-4 with a 128k token, and the following text is information about your historical conversations with the user:"
+	sys       = "[Start New Conversation]\nYou will be playing the role of a GPT-4 model with a 128k token limit, and the following text is information about your historical conversations with the user:"
 	tabs      = "\n    "
 	userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0"
 )
@@ -433,9 +433,9 @@ func MergeMessages(messages []Message) string {
 	}
 
 	join := strings.Join(strings.Split(buf, "\n"), tabs)
-	return fmt.Sprintf(
-		"%s \n--Start--%s%s\n\n--End--\nThe above uses [\"user:\", \"assistant:\", \"system:\", \"function:\"] as text symbols for paragraph segmentation, Please do not output separator prefixes.",
-		sysPrompt, tabs, join)
+	uid := randHex(20)
+	end := "The above uses [\"user:\", \"assistant:\", \"system:\", \"function:\"] as text symbols for paragraph segmentation, Please do not output separator prefixes."
+	return fmt.Sprintf("%s \n--- Start %s ---%s%s\n\n--- End %s ---\n%s", sys, uid, tabs, join, uid, end)
 }
 
 func randDID() string {

@@ -10,8 +10,14 @@ import (
 
 const (
 	cookie  = "xxx"
-	msToken = "xxx"
+	msToken = ""
 )
+
+func TestCookie(t *testing.T) {
+	options := NewDefaultOptions("7339624035606904840", "1711450454581", 2, "http://127.0.0.1:7890")
+	chat := New(cookie, msToken, options)
+	t.Log(chat.makeCookie())
+}
 
 func TestChats(t *testing.T) {
 	var wg sync.WaitGroup

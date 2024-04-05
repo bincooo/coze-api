@@ -58,9 +58,9 @@ func (c *Chat) Reply(ctx context.Context, query string) (chan string, error) {
 		return nil, err
 	}
 
-	data := c.makeData(conversationId, query)
+	payload := c.makePayload(conversationId, query)
 	// 签名
-	bogus, signature, err := sign(c.opts.proxies, c.msToken, data)
+	bogus, signature, err := sign(c.opts.proxies, c.msToken, payload)
 	if err != nil {
 		return nil, err
 	}
@@ -74,11 +74,11 @@ func (c *Chat) Reply(ctx context.Context, query string) (chan string, error) {
 		Query("X-Bogus", bogus).
 		Query("_signature", signature).
 		Header("user-agent", userAgent).
-		Header("cookie", "sessionid="+c.cookie).
+		Header("cookie", c.makeCookie()).
 		Header("origin", "https://www.coze.com").
 		Header("referer", "https://www.coze.com/store/bot").
 		JsonHeader().
-		SetBody(data).
+		SetBody(payload).
 		Do()
 	if err != nil {
 		return nil, err
@@ -100,10 +100,10 @@ func (c *Chat) Images(ctx context.Context, prompt string) (string, error) {
 	}
 
 	query := fmt.Sprintf("Paint on command:\n    style: exquisite, HD\n    prompt: %s", prompt)
-	data := c.makeData(conversationId, query)
+	payload := c.makePayload(conversationId, query)
 
 	// 签名
-	bogus, signature, err := sign(c.opts.proxies, c.msToken, data)
+	bogus, signature, err := sign(c.opts.proxies, c.msToken, payload)
 	if err != nil {
 		return "", err
 	}
@@ -117,11 +117,11 @@ func (c *Chat) Images(ctx context.Context, prompt string) (string, error) {
 		Query("X-Bogus", bogus).
 		Query("_signature", signature).
 		Header("user-agent", userAgent).
-		Header("cookie", "sessionid="+c.cookie).
+		Header("cookie", c.makeCookie()).
 		Header("origin", "https://www.coze.com").
 		Header("referer", "https://www.coze.com/store/bot").
 		JsonHeader().
-		SetBody(data).
+		SetBody(payload).
 		Do()
 	if err != nil {
 		return "", err
@@ -151,7 +151,35 @@ func (c *Chat) Images(ctx context.Context, prompt string) (string, error) {
 	}
 }
 
-func (c *Chat) makeData(conversationId string, query string) map[string]interface{} {
+func (c *Chat) makeCookie() (cookie string) {
+	var cookies []string
+	hmt := false
+
+	if !strings.Contains(c.cookie, "sessionid") {
+		cookies = strings.Split("sessionid="+c.cookie, "; ")
+	} else {
+		cookies = strings.Split(c.cookie, "; ")
+	}
+
+	for _, co := range cookies {
+		kv := strings.Split(co, "=")
+		if len(kv) > 1 {
+			k := kv[0]
+			v := strings.Join(kv[1:], "")
+			if k == "msToken" {
+				v = c.msToken
+				hmt = true
+			}
+			cookie += fmt.Sprintf("%s=%s; ", k, v)
+		}
+	}
+	if !hmt {
+		cookie += fmt.Sprintf("msToken=%s; ", c.msToken)
+	}
+	return
+}
+
+func (c *Chat) makePayload(conversationId string, query string) map[string]interface{} {
 	data := map[string]interface{}{
 		"bot_id":                      c.opts.botId,
 		"conversation_id":             conversationId,
@@ -229,10 +257,6 @@ func (c *Chat) reportMsToken() (string, error) {
 		Method(http.MethodPost).
 		URL(fmt.Sprintf("%s/web/report", res.Data["url"])).
 		Query("msToken", c.msToken).
-		Header("user-agent", userAgent).
-		Header("cookie", "sessionid="+c.cookie).
-		Header("origin", "https://www.coze.com").
-		Header("referer", "https://www.coze.com/store/bot").
 		JsonHeader().
 		SetBody(res.Data).
 		Do()
@@ -264,7 +288,7 @@ func (c *Chat) getCon() (string, error) {
 		URL(fmt.Sprintf("%s/get_conversation", BaseURL)).
 		Query("msToken", c.msToken).
 		Header("user-agent", userAgent).
-		Header("cookie", "sessionid="+c.cookie).
+		Header("cookie", c.makeCookie()).
 		Header("origin", "https://www.coze.com").
 		Header("referer", "https://www.coze.com/store/bot").
 		JsonHeader().
@@ -307,7 +331,7 @@ func (c *Chat) delCon(conversationId string) {
 		URL(fmt.Sprintf("%s/clear_message", BaseURL)).
 		Query("msToken", c.msToken).
 		Header("user-agent", userAgent).
-		Header("cookie", "sessionid="+c.cookie).
+		Header("cookie", c.makeCookie()).
 		Header("origin", "https://www.coze.com").
 		Header("referer", "https://www.coze.com/store/bot").
 		JsonHeader().

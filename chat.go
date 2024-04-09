@@ -19,7 +19,7 @@ import (
 const (
 	sys       = "[Start New Conversation]\nYou will be playing the role of a GPT-4 model with a 128k token limit, and the following text is information about your historical conversations with the user:"
 	tabs      = "\n    "
-	userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0"
+	userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0"
 )
 
 var (
@@ -119,7 +119,7 @@ func (c *Chat) Images(ctx context.Context, prompt string) (string, error) {
 		Header("user-agent", userAgent).
 		Header("cookie", c.makeCookie()).
 		Header("origin", "https://www.coze.com").
-		Header("referer", "https://www.coze.com/store/bot").
+		Header("referer", "https://www.coze.com/").
 		JsonHeader().
 		SetBody(payload).
 		Do()
@@ -181,26 +181,26 @@ func (c *Chat) makeCookie() (cookie string) {
 
 func (c *Chat) makePayload(conversationId string, query string) map[string]interface{} {
 	data := map[string]interface{}{
-		"bot_id":                      c.opts.botId,
-		"conversation_id":             conversationId,
-		"content_type":                "text",
-		"query":                       query,
-		"scene":                       c.opts.scene,
-		"local_message_id":            randHex(21),
-		"extra":                       make(map[string]string),
-		"bot_version":                 c.opts.version,
-		"device_id":                   randDID(),
-		"draft_mode":                  false,
-		"stream":                      true,
-		"chat_history":                make([]int, 0),
-		"insert_history_message_list": make([]int, 0),
+		"bot_id":           c.opts.botId,
+		"conversation_id":  conversationId,
+		"local_message_id": randHex(21),
+		"content_type":     "text",
+		"query":            query,
+		"extra":            make(map[string]string),
+		"scene":            c.opts.scene,
+		"bot_version":      c.opts.version,
+		"draft_mode":       false,
+		"stream":           true,
+		"chat_history":     make([]int, 0),
+		"mention_list":     make([]int, 0),
+		"device_id":        randDID(),
 	}
 	return data
 }
 
 func sign(proxies string, msToken string, payload interface{}) (string, string, error) {
 	response, err := common.New().
-		Proxies(proxies).
+		//Proxies(proxies).
 		Method(http.MethodPost).
 		URL(SignURL).
 		Query("msToken", msToken).
@@ -232,7 +232,7 @@ func sign(proxies string, msToken string, payload interface{}) (string, string, 
 
 func (c *Chat) reportMsToken() (string, error) {
 	response, err := common.New().
-		Proxies(c.opts.proxies).
+		//Proxies(c.opts.proxies).
 		URL(SignURL + "/report").
 		Do()
 	if err != nil {
@@ -278,8 +278,9 @@ func (c *Chat) reportMsToken() (string, error) {
 
 func (c *Chat) getCon() (string, error) {
 	obj := map[string]interface{}{
-		"bot_id": c.opts.botId,
-		"scene":  c.opts.scene,
+		"bot_id":     c.opts.botId,
+		"draft_mode": false,
+		"scene":      c.opts.scene,
 	}
 
 	response, err := common.New().

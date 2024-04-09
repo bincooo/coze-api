@@ -14,7 +14,7 @@ const (
 )
 
 func TestCookie(t *testing.T) {
-	options := NewDefaultOptions("7339624035606904840", "1711450454581", 2, "http://127.0.0.1:7890")
+	options := NewDefaultOptions("7353047124357365778", "1712645567468", 2, "http://127.0.0.1:7890")
 	chat := New(cookie, msToken, options)
 	t.Log(chat.makeCookie())
 }
@@ -33,7 +33,7 @@ func TestChats(t *testing.T) {
 }
 
 func TestChat(t *testing.T) {
-	options := NewDefaultOptions("7339624035606904840", "1711450454581", 2, "http://127.0.0.1:7890")
+	options := NewDefaultOptions("7353047124357365778", "1712645567468", 2, "http://127.0.0.1:7890")
 	chat := New(cookie, msToken, options)
 	messages := []Message{
 		{
@@ -70,7 +70,7 @@ func TestChat(t *testing.T) {
 }
 
 func TestImages(t *testing.T) {
-	options := NewDefaultOptions("7349524440562090002", "1711195961118", 2, "http://127.0.0.1:7890")
+	options := NewDefaultOptions("7353047124357365778", "1712645567468", 2, "http://127.0.0.1:7890")
 	chat := New(cookie, msToken, options)
 	timeout, withTimeout := context.WithTimeout(context.Background(), 120*time.Second)
 	defer withTimeout()

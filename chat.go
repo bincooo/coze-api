@@ -90,6 +90,8 @@ func (c *Chat) Reply(ctx context.Context, query string) (chan string, error) {
 
 	ch := make(chan string)
 	go c.resolve(ctx, conversationId, response, ch)
+	go c.createSection(conversationId)
+
 	return ch, nil
 }
 
@@ -133,6 +135,7 @@ func (c *Chat) Images(ctx context.Context, prompt string) (string, error) {
 
 	ch := make(chan string)
 	go c.resolve(ctx, conversationId, response, ch)
+	go c.createSection(conversationId)
 
 	for {
 		message, ok := <-ch
@@ -181,18 +184,18 @@ func (c *Chat) makeCookie() (cookie string) {
 
 func (c *Chat) makePayload(conversationId string, query string) map[string]interface{} {
 	data := map[string]interface{}{
-		"bot_id":           c.opts.botId,
-		"conversation_id":  conversationId,
-		"local_message_id": randHex(21),
 		"content_type":     "text",
 		"query":            query,
+		"local_message_id": randHex(21),
 		"extra":            make(map[string]string),
 		"scene":            c.opts.scene,
 		"bot_version":      c.opts.version,
+		"bot_id":           c.opts.botId,
+		"conversation_id":  conversationId,
 		"draft_mode":       false,
 		"stream":           true,
-		"chat_history":     make([]int, 0),
-		"mention_list":     make([]int, 0),
+		"chat_history":     make([]string, 0),
+		"mention_list":     make([]string, 0),
 		"device_id":        randDID(),
 	}
 	return data
@@ -278,15 +281,19 @@ func (c *Chat) reportMsToken() (string, error) {
 
 func (c *Chat) getCon() (string, error) {
 	obj := map[string]interface{}{
-		"bot_id":     c.opts.botId,
-		"draft_mode": false,
-		"scene":      c.opts.scene,
+		"cursor":                      "0",
+		"count":                       15,
+		"draft_mode":                  false,
+		"bot_id":                      c.opts.botId,
+		"scene":                       c.opts.scene,
+		"biz_kind":                    "",
+		"insert_history_message_list": make([]string, 0),
 	}
 
 	response, err := common.New().
 		Proxies(c.opts.proxies).
 		Method(http.MethodPost).
-		URL(fmt.Sprintf("%s/get_conversation", BaseURL)).
+		URL(fmt.Sprintf("%s/get_message_list", BaseURL)).
 		Query("msToken", c.msToken).
 		Header("user-agent", userAgent).
 		Header("cookie", c.makeCookie()).
@@ -319,6 +326,41 @@ func (c *Chat) getCon() (string, error) {
 	}
 
 	return "", fmt.Errorf("%s", data)
+}
+
+func (c *Chat) createSection(conversationId string) {
+	if conversationId == "" {
+		return
+	}
+
+	response, err := common.New().
+		Proxies(c.opts.proxies).
+		Method(http.MethodPost).
+		URL(fmt.Sprintf("%s/create_section", BaseURL)).
+		Query("msToken", c.msToken).
+		Header("user-agent", userAgent).
+		Header("cookie", c.makeCookie()).
+		Header("origin", "https://www.coze.com").
+		Header("referer", "https://www.coze.com/store/bot").
+		JsonHeader().
+		SetBody(map[string]any{
+			"insert_history_message_list": make([]string, 0),
+			"conversation_id":             conversationId,
+			"scene":                       c.opts.scene,
+		}).
+		Do()
+	if err != nil {
+		fmt.Printf("createSection [%s] failed: %v\n", conversationId, err)
+		return
+	}
+
+	if response.StatusCode != http.StatusOK {
+		fmt.Printf("createSection [%s] failed: %s\n", conversationId, response.Status)
+		return
+	}
+
+	data, _ := io.ReadAll(response.Body)
+	fmt.Printf("%s\n", data)
 }
 
 func (c *Chat) delCon(conversationId string) {

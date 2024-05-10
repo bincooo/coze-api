@@ -17,8 +17,6 @@ import (
 )
 
 const (
-	sys       = "[Start New Conversation]\nYou will be playing the role of a GPT-4 model with a 128k token limit, and the following text is information about your historical conversations with the user:"
-	tabs      = "\n    "
 	userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0"
 )
 
@@ -487,22 +485,27 @@ func MergeMessages(messages []Message) string {
 		return ""
 	}
 
-	buf := ""
+	buf := new(bytes.Buffer)
 	lastRole := ""
 
 	for _, message := range messages {
-		if lastRole == "" || lastRole != message.Role {
+		if lastRole == "" {
+			buf.WriteString(fmt.Sprintf("<|%s|>", message.Role))
 			lastRole = message.Role
-			buf += fmt.Sprintf("\n%s: %s%s", message.Role, tabs, strings.Join(strings.Split(message.Content, "\n"), tabs))
+		}
+
+		if lastRole != message.Role {
+			buf.WriteString("<|end|>\n")
+			buf.WriteString(fmt.Sprintf("<|%s|>\n%s", message.Role, message.Content))
+			lastRole = message.Role
 			continue
 		}
-		buf += fmt.Sprintf("\n%s%s", tabs, strings.Join(strings.Split(message.Content, "\n"), tabs))
+
+		buf.WriteString(fmt.Sprintf("\n%s", message.Content))
 	}
 
-	join := strings.Join(strings.Split(buf, "\n"), tabs)
-	uid := randHex(20)
-	end := "The above uses [\"user:\", \"assistant:\", \"system:\", \"function:\"] as text symbols for paragraph segmentation, Please do not output separator prefixes."
-	return fmt.Sprintf("%s \n--- Start %s ---%s%s\n\n--- End %s ---\n%s", sys, uid, tabs, join, uid, end)
+	buf.WriteString("<|end|>\n<|assistant|>")
+	return buf.String()
 }
 
 func randDID() string {

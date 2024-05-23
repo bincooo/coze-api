@@ -23,6 +23,7 @@ const (
 var (
 	BaseURL = "https://www.coze.com/api/conversation"
 	SignURL = "https://complete-mmx-coze-helper.hf.space"
+	//SignURL = "http://127.0.0.1:3000"
 )
 
 func NewDefaultOptions(botId, version string, scene int, proxies string) Options {
@@ -253,17 +254,24 @@ func (c *Chat) reportMsToken() (string, error) {
 		return "", errors.New("refresh msToken failed")
 	}
 
-	response, err = common.New().
+	url := res.Data["url"]
+	delete(res.Data, "url")
+	r := common.New().
 		Proxies(c.opts.proxies).
 		Method(http.MethodPost).
-		URL(fmt.Sprintf("%s/web/report", res.Data["url"])).
-		Query("msToken", c.msToken).
+		URL(fmt.Sprintf("%s/web/report", url)).
 		JsonHeader().
-		SetBody(res.Data).
-		Do()
+		SetBody(res.Data)
+	if c.msToken != "" {
+		r.Query("msToken", c.msToken)
+	}
+	response, err = r.Do()
 	if err != nil {
 		return "", err
 	}
+
+	bs, _ := io.ReadAll(response.Body)
+	fmt.Println(string(bs))
 
 	if response.StatusCode != http.StatusOK {
 		return "", errors.New(response.Status)

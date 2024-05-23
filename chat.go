@@ -167,7 +167,7 @@ func (c *Chat) makeCookie() (cookie string) {
 		kv := strings.Split(co, "=")
 		if len(kv) > 1 {
 			k := kv[0]
-			v := strings.Join(kv[1:], "")
+			v := strings.Join(kv[1:], "=")
 			if k == "msToken" {
 				v = c.msToken
 				hmt = true

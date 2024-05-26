@@ -147,14 +147,19 @@ func (c *Chat) Images(ctx context.Context, prompt string) (string, error) {
 	for {
 		message, ok := <-ch
 		if !ok {
-			return "", errors.New("images failed")
+			return "", errors.New("paint failed")
 		}
 
 		if strings.HasPrefix(message, "error: ") {
 			return "", errors.New(strings.TrimPrefix(message, "error: "))
 		}
 
-		reg, _ := regexp.Compile(`"url":"(https://[^"]+)",`)
+		reg, _ := regexp.Compile(`!\[[^]]+]\((https://[^)]+)\)`)
+		if matchList := reg.FindStringSubmatch(message); len(matchList) > 1 {
+			return matchList[1], nil
+		}
+
+		reg, _ = regexp.Compile(`"url":"(https://[^"]+)",`)
 		if matchList := reg.FindStringSubmatch(message); len(matchList) > 1 {
 			return matchList[1], nil
 		}

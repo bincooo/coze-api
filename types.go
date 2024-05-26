@@ -31,5 +31,6 @@ type resMessage struct {
 
 type signResponse[T any] struct {
 	Ok   bool
+	Msg  string
 	Data T
 }

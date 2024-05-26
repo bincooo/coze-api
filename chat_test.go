@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	cookie  = "xxx"
+	cookie  = "i18next=en; s_v_web_id=verify_luqkzo4f_L6r2H2qM_Ql9X_4iFB_A81K_T7CmQVaskOeH; passport_csrf_token=1786fe31415483e95b715df390665efe; passport_csrf_token_default=1786fe31415483e95b715df390665efe; store-idc=alisg; store-country-code=hk; store-country-code-src=uid; consent_cookie={%22analytics_and_performance%22:{%22active%22:true%2C%22disabled%22:false}}; ttwid=1%7CXVEdzTLdGtlE0di82FmKNQlupEOr4l4ige0eCSX4IxY%7C1712558362%7C751affa577c7b9169b1e180c42b1f39e93a8400738e1b99cc9c1aa14f8a71e93; odin_tt=d75e9c7392aa28310a732a04bf2e31f9eab60ae6b61b8e5f608c8f37454fb47df1faca334679c82103cff8c2b4282b20d9f23943853619d21c823c2838821584; passport_auth_status=8700dae6291153f8ed3eafdbf9651bbc%2Cdc00608b25c2fa951a178d8387cbfecb; passport_auth_status_ss=8700dae6291153f8ed3eafdbf9651bbc%2Cdc00608b25c2fa951a178d8387cbfecb; sid_guard=bc4d4ae0aa5dbc60940b6a3f9a420e17%7C1712558363%7C5184000%7CFri%2C+07-Jun-2024+06%3A39%3A23+GMT; uid_tt=4ca6ea81622e0e5418a98f9b389343fdbd7b1eb751cf0e5fb0e8436c5c6ec3e9; uid_tt_ss=4ca6ea81622e0e5418a98f9b389343fdbd7b1eb751cf0e5fb0e8436c5c6ec3e9; sid_tt=bc4d4ae0aa5dbc60940b6a3f9a420e17; sessionid=bc4d4ae0aa5dbc60940b6a3f9a420e17; sessionid_ss=bc4d4ae0aa5dbc60940b6a3f9a420e17; sid_ucp_v1=1.0.0-KDdmOTY2MGYyMWI0MGZlODE4MzRjYzViYmQxYjUxMWIwNzRmMTVlNGEKIAiRiN6ChZ_kiWYQm6LOsAYY1J0fIAwwm6LOsAY4CEASEAMaA3NnMSIgYmM0ZDRhZTBhYTVkYmM2MDk0MGI2YTNmOWE0MjBlMTc; ssid_ucp_v1=1.0.0-KDdmOTY2MGYyMWI0MGZlODE4MzRjYzViYmQxYjUxMWIwNzRmMTVlNGEKIAiRiN6ChZ_kiWYQm6LOsAYY1J0fIAwwm6LOsAY4CEASEAMaA3NnMSIgYmM0ZDRhZTBhYTVkYmM2MDk0MGI2YTNmOWE0MjBlMTc; msToken=FVTpEJHmz1aYHPJmD_jWbwHjmKaOvtmtq8ouPieUFaXr2JXvApw1FGJARGaT6vN_twJ9B4zSHDCEGEpSZJiNtAuoLWymCAAiB8QflzGDLwksNSiP9Afb-jOIpj2zCQ==; msToken=FVTpEJHmz1aYHPJmD_jWbwHjmKaOvtmtq8ouPieUFaXr2JXvApw1FGJARGaT6vN_twJ9B4zSHDCEGEpSZJiNtAuoLWymCAAiB8QflzGDLwksNSiP9Afb-jOIpj2zCQ=="
 	msToken = ""
 )
 
@@ -71,7 +71,7 @@ func TestChat(t *testing.T) {
 }
 
 func TestImages(t *testing.T) {
-	options := NewDefaultOptions("7353047124357365778", "1712645567468", 2, "http://127.0.0.1:7890")
+	options := NewDefaultOptions("7353052833752694791", "1712016747307", 2, "http://127.0.0.1:7890")
 	chat := New(cookie, msToken, options)
 	timeout, withTimeout := context.WithTimeout(context.Background(), 120*time.Second)
 	defer withTimeout()

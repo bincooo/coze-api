@@ -95,6 +95,14 @@ func (c *Chat) Reply(ctx context.Context, query string) (chan string, error) {
 }
 
 func (c *Chat) Images(ctx context.Context, prompt string) (string, error) {
+	if c.msToken == "" {
+		msToken, err := c.reportMsToken()
+		if err != nil {
+			return "", err
+		}
+		c.msToken = msToken
+	}
+
 	conversationId, err := c.getCon()
 	if err != nil {
 		return "", err
@@ -139,14 +147,14 @@ func (c *Chat) Images(ctx context.Context, prompt string) (string, error) {
 	for {
 		message, ok := <-ch
 		if !ok {
-			return "", errors.New("paint failed")
+			return "", errors.New("images failed")
 		}
 
 		if strings.HasPrefix(message, "error: ") {
 			return "", errors.New(strings.TrimPrefix(message, "error: "))
 		}
 
-		reg, _ := regexp.Compile(`!\[[^]]+]\((https://[^)]+)\)`)
+		reg, _ := regexp.Compile(`"url":"(https://[^"]+)",`)
 		if matchList := reg.FindStringSubmatch(message); len(matchList) > 1 {
 			return matchList[1], nil
 		}
@@ -223,7 +231,7 @@ func sign(proxies string, msToken string, payload interface{}) (string, string, 
 	}
 
 	if !res.Ok {
-		return "", "", fmt.Errorf("coze-sign: %s", res.Data)
+		return "", "", fmt.Errorf("coze-sign: %s", res.Msg)
 	}
 
 	bogus := res.Data["bogus"].(string)

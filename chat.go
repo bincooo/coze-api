@@ -117,6 +117,10 @@ func (c *Chat) Images(ctx context.Context, prompt string) (string, error) {
 		return "", err
 	}
 
+	retry := 3
+label:
+
+	retry--
 	response, err := common.New().
 		Context(ctx).
 		Proxies(c.opts.proxies).
@@ -144,26 +148,37 @@ func (c *Chat) Images(ctx context.Context, prompt string) (string, error) {
 	go c.resolve(ctx, conversationId, response, ch)
 	go c.createSection(conversationId)
 
+	content := ""
 	for {
 		message, ok := <-ch
 		if !ok {
-			return "", errors.New("paint failed")
+			break
 		}
 
 		if strings.HasPrefix(message, "error: ") {
 			return "", errors.New(strings.TrimPrefix(message, "error: "))
 		}
 
-		reg, _ := regexp.Compile(`!\[[^]]+]\((https://[^)]+)\)`)
-		if matchList := reg.FindStringSubmatch(message); len(matchList) > 1 {
+		content += strings.TrimPrefix(message, "text: ")
+	}
+	if len(content) > 0 {
+		reg, _ := regexp.Compile(`\[[^]]+]\((https://[^)]+)\)`)
+		if matchList := reg.FindStringSubmatch(content); len(matchList) > 1 {
 			return matchList[1], nil
 		}
 
 		reg, _ = regexp.Compile(`"url":"(https://[^"]+)",`)
-		if matchList := reg.FindStringSubmatch(message); len(matchList) > 1 {
+		if matchList := reg.FindStringSubmatch(content); len(matchList) > 1 {
 			return matchList[1], nil
 		}
 	}
+
+	// 奇葩，会道歉？I apologize, but I am unable to fulfill your request to ...
+	if retry > 0 {
+		goto label
+	}
+
+	return "", errors.New("images failed")
 }
 
 func (c *Chat) makeCookie() (cookie string) {

@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/bincooo/coze-api/common"
+	"github.com/bincooo/emit.io"
 	"io"
 	"math/rand"
 	"net/http"
@@ -64,7 +64,7 @@ func (c *Chat) Reply(ctx context.Context, query string) (chan string, error) {
 		return nil, err
 	}
 
-	response, err := common.New().
+	response, err := emit.ClientBuilder().
 		Context(ctx).
 		Proxies(c.opts.proxies).
 		Method(http.MethodPost).
@@ -76,15 +76,11 @@ func (c *Chat) Reply(ctx context.Context, query string) (chan string, error) {
 		Header("cookie", c.makeCookie()).
 		Header("origin", "https://www.coze.com").
 		Header("referer", "https://www.coze.com/store/bot").
-		JsonHeader().
-		SetBody(payload).
-		Do()
+		JHeader().
+		Body(payload).
+		DoC(emit.Status(http.StatusOK), emit.IsSTREAM)
 	if err != nil {
 		return nil, err
-	}
-
-	if response.StatusCode != http.StatusOK {
-		return nil, errors.New(response.Status)
 	}
 
 	ch := make(chan string)
@@ -121,7 +117,7 @@ func (c *Chat) Images(ctx context.Context, prompt string) (string, error) {
 label:
 
 	retry--
-	response, err := common.New().
+	response, err := emit.ClientBuilder().
 		Context(ctx).
 		Proxies(c.opts.proxies).
 		Method(http.MethodPost).
@@ -133,15 +129,11 @@ label:
 		Header("cookie", c.makeCookie()).
 		Header("origin", "https://www.coze.com").
 		Header("referer", "https://www.coze.com/").
-		JsonHeader().
-		SetBody(payload).
-		Do()
+		JHeader().
+		Body(payload).
+		DoC(emit.Status(http.StatusOK), emit.IsSTREAM)
 	if err != nil {
 		return "", err
-	}
-
-	if response.StatusCode != http.StatusOK {
-		return "", errors.New(response.Status)
 	}
 
 	ch := make(chan string)
@@ -229,24 +221,20 @@ func (c *Chat) makePayload(conversationId string, query string) map[string]inter
 }
 
 func sign(proxies string, msToken string, payload interface{}) (string, string, error) {
-	response, err := common.New().
+	response, err := emit.ClientBuilder().
 		//Proxies(proxies).
 		Method(http.MethodPost).
 		URL(SignURL).
 		Query("msToken", msToken).
-		JsonHeader().
-		SetBody(payload).
-		Do()
+		JHeader().
+		Body(payload).
+		DoS(http.StatusOK)
 	if err != nil {
 		return "", "", fmt.Errorf("coze-sign: %v", err)
 	}
 
-	if response.StatusCode != http.StatusOK {
-		return "", "", fmt.Errorf("coze-sign: %s", response.Status)
-	}
-
 	var res signResponse[map[string]interface{}]
-	if err = common.ToObj(response, &res); err != nil {
+	if err = emit.ToObject(response, &res); err != nil {
 		return "", "", fmt.Errorf("coze-sign: %s", err)
 	}
 
@@ -261,20 +249,16 @@ func sign(proxies string, msToken string, payload interface{}) (string, string, 
 }
 
 func (c *Chat) reportMsToken() (string, error) {
-	response, err := common.New().
+	response, err := emit.ClientBuilder().
 		//Proxies(c.opts.proxies).
 		URL(SignURL + "/report").
-		Do()
+		DoS(http.StatusOK)
 	if err != nil {
 		return "", err
 	}
 
-	if response.StatusCode != http.StatusOK {
-		return "", errors.New(response.Status)
-	}
-
 	var res signResponse[map[string]interface{}]
-	if err = common.ToObj(response, &res); err != nil {
+	if err = emit.ToObject(response, &res); err != nil {
 		return "", err
 	}
 
@@ -284,16 +268,16 @@ func (c *Chat) reportMsToken() (string, error) {
 
 	url := res.Data["url"]
 	delete(res.Data, "url")
-	r := common.New().
+	r := emit.ClientBuilder().
 		Proxies(c.opts.proxies).
 		Method(http.MethodPost).
 		URL(fmt.Sprintf("%s/web/report", url)).
-		JsonHeader().
-		SetBody(res.Data)
+		JHeader().
+		Body(res.Data)
 	if c.msToken != "" {
 		r.Query("msToken", c.msToken)
 	}
-	response, err = r.Do()
+	response, err = r.DoS(http.StatusOK)
 	if err != nil {
 		return "", err
 	}
@@ -301,11 +285,7 @@ func (c *Chat) reportMsToken() (string, error) {
 	bs, _ := io.ReadAll(response.Body)
 	fmt.Println(string(bs))
 
-	if response.StatusCode != http.StatusOK {
-		return "", errors.New(response.Status)
-	}
-
-	cookie := common.GetCookie(response, "msToken")
+	cookie := emit.GetCookie(response, "msToken")
 	if cookie == "" {
 		return cookie, errors.New("refresh msToken failed")
 	}
@@ -324,7 +304,7 @@ func (c *Chat) getCon() (string, error) {
 		"insert_history_message_list": make([]string, 0),
 	}
 
-	response, err := common.New().
+	response, err := emit.ClientBuilder().
 		Proxies(c.opts.proxies).
 		Method(http.MethodPost).
 		URL(fmt.Sprintf("%s/get_message_list", BaseURL)).
@@ -333,15 +313,11 @@ func (c *Chat) getCon() (string, error) {
 		Header("cookie", c.makeCookie()).
 		Header("origin", "https://www.coze.com").
 		Header("referer", "https://www.coze.com/store/bot").
-		JsonHeader().
-		SetBody(obj).
-		Do()
+		JHeader().
+		Body(obj).
+		DoS(http.StatusOK)
 	if err != nil {
 		return "", err
-	}
-
-	if response.StatusCode != http.StatusOK {
-		return "", errors.New(response.Status)
 	}
 
 	data, err := io.ReadAll(response.Body)
@@ -367,7 +343,7 @@ func (c *Chat) createSection(conversationId string) {
 		return
 	}
 
-	response, err := common.New().
+	response, err := emit.ClientBuilder().
 		Proxies(c.opts.proxies).
 		Method(http.MethodPost).
 		URL(fmt.Sprintf("%s/create_section", BaseURL)).
@@ -376,20 +352,15 @@ func (c *Chat) createSection(conversationId string) {
 		Header("cookie", c.makeCookie()).
 		Header("origin", "https://www.coze.com").
 		Header("referer", "https://www.coze.com/store/bot").
-		JsonHeader().
-		SetBody(map[string]any{
+		JHeader().
+		Body(map[string]any{
 			"insert_history_message_list": make([]string, 0),
 			"conversation_id":             conversationId,
 			"scene":                       c.opts.scene,
 		}).
-		Do()
+		DoS(http.StatusOK)
 	if err != nil {
 		fmt.Printf("createSection [%s] failed: %v\n", conversationId, err)
-		return
-	}
-
-	if response.StatusCode != http.StatusOK {
-		fmt.Printf("createSection [%s] failed: %s\n", conversationId, response.Status)
 		return
 	}
 
@@ -402,7 +373,7 @@ func (c *Chat) delCon(conversationId string) {
 		return
 	}
 
-	response, err := common.New().
+	response, err := emit.ClientBuilder().
 		Proxies(c.opts.proxies).
 		Method(http.MethodPost).
 		URL(fmt.Sprintf("%s/clear_message", BaseURL)).
@@ -411,20 +382,15 @@ func (c *Chat) delCon(conversationId string) {
 		Header("cookie", c.makeCookie()).
 		Header("origin", "https://www.coze.com").
 		Header("referer", "https://www.coze.com/store/bot").
-		JsonHeader().
-		SetBody(map[string]any{
+		JHeader().
+		Body(map[string]any{
 			"bot_id":          c.opts.botId,
 			"conversation_id": conversationId,
 			"scene":           c.opts.scene,
 		}).
-		Do()
+		DoS(http.StatusOK)
 	if err != nil {
 		fmt.Printf("delCon [%s] failed: %v\n", conversationId, err)
-		return
-	}
-
-	if response.StatusCode != http.StatusOK {
-		fmt.Printf("delCon [%s] failed: %s\n", conversationId, response.Status)
 		return
 	}
 

@@ -11,9 +11,14 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
+	"os"
+	"path/filepath"
+	"reflect"
 	"regexp"
 	"strings"
 	"time"
+
+	"hash/crc32"
 )
 
 const (
@@ -22,8 +27,21 @@ const (
 
 var (
 	BaseURL = "https://www.coze.com/api/conversation"
-	SignURL = "https://complete-mmx-coze-helper.hf.space"
-	//SignURL = "http://127.0.0.1:3000"
+	//SignURL = "https://complete-mmx-coze-helper.hf.space"
+	SignURL = "http://127.0.0.1:3000"
+)
+
+type MessageType struct {
+	t string
+}
+
+func (t MessageType) String() string {
+	return t.t
+}
+
+var (
+	Text = MessageType{"text"}
+	Mix  = MessageType{"mix"}
 )
 
 func NewDefaultOptions(botId, version string, scene int, proxies string) Options {
@@ -43,7 +61,7 @@ func New(cookie, msToken string, opts Options) Chat {
 	}
 }
 
-func (c *Chat) Reply(ctx context.Context, query string) (chan string, error) {
+func (c *Chat) Reply(ctx context.Context, t MessageType, query string) (chan string, error) {
 	if c.msToken == "" {
 		msToken, err := c.reportMsToken()
 		if err != nil {
@@ -57,7 +75,7 @@ func (c *Chat) Reply(ctx context.Context, query string) (chan string, error) {
 		return nil, err
 	}
 
-	payload := c.makePayload(conversationId, query)
+	payload := c.makePayload(conversationId, t, query)
 	// 签名
 	bogus, signature, err := sign(c.opts.proxies, c.msToken, payload)
 	if err != nil {
@@ -67,8 +85,7 @@ func (c *Chat) Reply(ctx context.Context, query string) (chan string, error) {
 	response, err := emit.ClientBuilder().
 		Context(ctx).
 		Proxies(c.opts.proxies).
-		Method(http.MethodPost).
-		URL(fmt.Sprintf("%s/chat", BaseURL)).
+		POST(fmt.Sprintf("%s/chat", BaseURL)).
 		Query("msToken", c.msToken).
 		Query("X-Bogus", bogus).
 		Query("_signature", signature).
@@ -105,7 +122,7 @@ func (c *Chat) Images(ctx context.Context, prompt string) (string, error) {
 	}
 
 	query := fmt.Sprintf("Paint on command:\n    style: exquisite, HD\n    prompt: %s", prompt)
-	payload := c.makePayload(conversationId, query)
+	payload := c.makePayload(conversationId, Text, query)
 
 	// 签名
 	bogus, signature, err := sign(c.opts.proxies, c.msToken, payload)
@@ -120,8 +137,7 @@ label:
 	response, err := emit.ClientBuilder().
 		Context(ctx).
 		Proxies(c.opts.proxies).
-		Method(http.MethodPost).
-		URL(fmt.Sprintf("%s/chat", BaseURL)).
+		POST(fmt.Sprintf("%s/chat", BaseURL)).
 		Query("msToken", c.msToken).
 		Query("X-Bogus", bogus).
 		Query("_signature", signature).
@@ -173,6 +189,266 @@ label:
 	return "", errors.New("images failed")
 }
 
+// 文件上传
+func (c *Chat) Upload(ctx context.Context, file string) (string, error) {
+	// 啰里八嗦的代码，狗看了都摇头
+	retry := 3
+label:
+	retry--
+	{
+		msToken, err := c.reportMsToken()
+		if err != nil {
+			return "", err
+		}
+		c.msToken = msToken
+	}
+
+	payload := map[string]string{
+		"scene": "bot_task",
+	}
+	bogus, signature, err := sign(c.opts.proxies, c.msToken, payload)
+	if err != nil {
+		return "", err
+	}
+
+	fileBytes, err := os.ReadFile(file)
+	if err != nil {
+		return "", err
+	}
+
+	// 1. 下载凭证
+	response, err := emit.ClientBuilder().
+		Proxies(c.opts.proxies).
+		Context(ctx).
+		POST("https://www.coze.com/api/playground/upload/auth_token").
+		Query("msToken", c.msToken).
+		Query("X-Bogus", bogus).
+		Query("_signature", signature).
+		Header("origin", "https://www.coze.com").
+		Header("referer", "https://www.coze.com/").
+		Header("cookie", c.makeCookie()).
+		Header("user-agent", userAgent).
+		JHeader().
+		Body(payload).
+		DoS(http.StatusOK)
+	if err != nil {
+		return "", err
+	}
+
+	obj, err := emit.ToMap(response)
+	if err != nil {
+		return "", err
+	}
+	if code, ok := obj["code"]; !ok || code.(float64) != 0 {
+		return "", fmt.Errorf("upload failed: %s", obj["msg"])
+	}
+	obj = obj["data"].(map[string]interface{})
+	serviceId := obj["service_id"].(string)
+	host := obj["upload_host"].(string)
+	auth := obj["auth"].(map[string]interface{})
+	fileExt := ".txt"
+	if ext := filepath.Ext(file); ext != "" {
+		fileExt = ext
+	}
+
+	// 2.1 签名
+	query := fmt.Sprintf("?Action=ApplyImageUpload&Version=2018-08-01&ServiceId=%s&FileSize=%d&FileExtension=%s", serviceId, len(file), fileExt)
+	response, err = emit.ClientBuilder().
+		//Proxies(c.opts.proxies).
+		Context(ctx).
+		POST(SignURL+"/upload-sign").
+		Query("mime", "imagex").
+		Query("accessKeyId", auth["access_key_id"].(string)).
+		Query("secretAccessKey", auth["secret_access_key"].(string)).
+		Query("sessionToken", auth["session_token"].(string)).
+		JHeader().
+		Body(map[string]interface{}{
+			"method":   "GET",
+			"url":      "https://" + host + "/" + query,
+			"timeout":  30000,
+			"pathname": "/",
+			"region":   "ap-singapore-1",
+			"params": map[string]interface{}{
+				"Action":        "ApplyImageUpload",
+				"Version":       "2018-08-01",
+				"ServiceId":     serviceId,
+				"FileSize":      len(file),
+				"FileExtension": fileExt,
+			},
+		}).
+		DoS(http.StatusOK)
+	if err != nil {
+		return "", err
+	}
+
+	obj, err = emit.ToMap(response)
+	if err != nil {
+		return "", err
+	}
+
+	if o, ok := obj["ok"]; !ok || !reflect.DeepEqual(o, true) {
+		return "", fmt.Errorf("upload failed: %s", obj["msg"])
+	}
+	obj = obj["data"].(map[string]interface{})
+	request := obj["request"].(map[string]interface{})
+	headers := request["headers"].(map[string]interface{})
+
+	// 2.2 ApplyImageUpload
+	response, err = emit.ClientBuilder().
+		Proxies(c.opts.proxies).
+		Context(ctx).
+		GET(request["url"].(string)).
+		Header("origin", "https://www.coze.com").
+		Header("referer", "https://www.coze.com/").
+		Header("X-Amz-Date", headers["X-Amz-Date"].(string)).
+		Header("x-amz-security-token", headers["x-amz-security-token"].(string)).
+		Header("Authorization", headers["Authorization"].(string)).
+		Header("user-agent", userAgent).
+		DoC(emit.Status(http.StatusOK), emit.IsJSON)
+	if err != nil {
+		return "", err
+	}
+
+	obj, err = emit.ToMap(response)
+	if err != nil {
+		return "", err
+	}
+
+	if _, ok := obj["Result"]; !ok {
+		if retry > 0 {
+			goto label
+		}
+		errMessage := obj["ResponseMetadata"].(map[string]interface{})["Error"]
+		return "", fmt.Errorf("upload failed: %v", errMessage)
+	}
+
+	obj = obj["Result"].(map[string]interface{})
+	uploadAddress := obj["InnerUploadAddress"].(map[string]interface{})
+	uploadAddress = uploadAddress["UploadNodes"].([]interface{})[0].(map[string]interface{})
+	storeInfo := uploadAddress["StoreInfos"].([]interface{})[0].(map[string]interface{})
+
+	// 3 上传文件
+	ieee := fmt.Sprintf("%x", crc32.ChecksumIEEE(fileBytes))
+	url := fmt.Sprintf("https://%s/upload/v1/%s", uploadAddress["UploadHost"], storeInfo["StoreUri"])
+	response, err = emit.ClientBuilder().
+		Proxies(c.opts.proxies).
+		Context(ctx).
+		POST(url).
+		Header("origin", "https://www.coze.com").
+		Header("referer", "https://www.coze.com/").
+		Header("Authorization", storeInfo["Auth"].(string)).
+		Header("Content-Crc32", ieee).
+		Header("Content-Type", "application/octet-stream").
+		Header("Content-Disposition", "attachment; filename=\"undefined\"").
+		//Header("X-Storage-U", "7353045591632774160").
+		Header("user-agent", userAgent).
+		Bytes(fileBytes).
+		DoC(emit.Status(http.StatusOK), emit.IsJSON)
+	if err != nil {
+		return "", err
+	}
+
+	obj, err = emit.ToMap(response)
+	if err != nil {
+		return "", err
+	}
+
+	// throw error:  Mismatch CRC32 ???
+	if code, ok := obj["code"]; !ok || code.(float64) != 2000 {
+		return "", fmt.Errorf("upload failed: %s", obj["message"])
+	}
+
+	// 2.1 签名
+	query = fmt.Sprintf("?Action=CommitImageUpload&Version=2018-08-01&ServiceId=%s", serviceId)
+	response, err = emit.ClientBuilder().
+		//Proxies(c.opts.proxies).
+		Context(ctx).
+		POST(SignURL+"/upload-sign").
+		Query("mime", "imagex").
+		Query("accessKeyId", auth["access_key_id"].(string)).
+		Query("secretAccessKey", auth["secret_access_key"].(string)).
+		Query("sessionToken", auth["session_token"].(string)).
+		JHeader().
+		Body(map[string]interface{}{
+			"method":   "POST",
+			"url":      "https://" + host + query,
+			"timeout":  30000,
+			"pathname": "/",
+			"region":   "ap-singapore-1",
+			"headers": map[string]interface{}{
+				"Content-Type": "application/json",
+			},
+			"params": map[string]interface{}{
+				"Action":    "CommitImageUpload",
+				"Version":   "2018-08-01",
+				"ServiceId": serviceId,
+			},
+			"custom": fmt.Sprintf(`{\"SessionKey\":\"%s\"}`, uploadAddress["SessionKey"]),
+			"body": map[string]interface{}{
+				"SessionKey": uploadAddress["SessionKey"],
+			},
+		}).
+		DoS(http.StatusOK)
+	if err != nil {
+		return "", err
+	}
+
+	obj, err = emit.ToMap(response)
+	if err != nil {
+		return "", err
+	}
+
+	if o, ok := obj["ok"]; !ok || !reflect.DeepEqual(o, true) {
+		return "", fmt.Errorf("upload failed: %s", obj["msg"])
+	}
+	obj = obj["data"].(map[string]interface{})
+	request = obj["request"].(map[string]interface{})
+	headers = request["headers"].(map[string]interface{})
+
+	// 4.2 CommitImageUpload
+	response, err = emit.ClientBuilder().
+		Proxies(c.opts.proxies).
+		Context(ctx).
+		POST(fmt.Sprintf("https://%s%s", host, query)).
+		Header("origin", "https://www.coze.com").
+		Header("referer", "https://www.coze.com/").
+		Header("X-Amz-Date", headers["X-Amz-Date"].(string)).
+		Header("X-Amz-Content-Sha256", headers["X-Amz-Content-Sha256"].(string)).
+		Header("x-amz-security-token", headers["x-amz-security-token"].(string)).
+		Header("Authorization", headers["Authorization"].(string)).
+		Header("user-agent", userAgent).
+		JHeader().
+		Body(map[string]interface{}{
+			"SessionKey": uploadAddress["SessionKey"],
+		}).
+		DoC(emit.Status(http.StatusOK), emit.IsJSON)
+	if err != nil {
+		return "", err
+	}
+
+	obj, err = emit.ToMap(response)
+	if err != nil {
+		return "", err
+	}
+
+	if _, ok := obj["Result"]; !ok {
+		if retry > 0 {
+			goto label
+		}
+		errMessage := obj["ResponseMetadata"].(map[string]interface{})["Error"]
+		return "", fmt.Errorf("upload failed: %v", errMessage)
+	}
+
+	obj = obj["Result"].(map[string]interface{})
+	pluginResult, ok := obj["PluginResult"].([]interface{})
+	if !ok {
+		return "", errors.New("upload failed")
+	}
+
+	info := pluginResult[0].(map[string]interface{})
+	return info["ImageUri"].(string), nil
+}
+
 func (c *Chat) makeCookie() (cookie string) {
 	var cookies []string
 	hmt := false
@@ -201,9 +477,9 @@ func (c *Chat) makeCookie() (cookie string) {
 	return
 }
 
-func (c *Chat) makePayload(conversationId string, query string) map[string]interface{} {
+func (c *Chat) makePayload(conversationId string, t MessageType, query string) map[string]interface{} {
 	data := map[string]interface{}{
-		"content_type":     "text",
+		//"content_type":     "text",
 		"query":            query,
 		"local_message_id": randHex(21),
 		"extra":            make(map[string]string),
@@ -216,6 +492,7 @@ func (c *Chat) makePayload(conversationId string, query string) map[string]inter
 		"chat_history":     make([]string, 0),
 		"mention_list":     make([]string, 0),
 		"device_id":        randDID(),
+		"content_type":     t.String(),
 	}
 	return data
 }
@@ -223,8 +500,7 @@ func (c *Chat) makePayload(conversationId string, query string) map[string]inter
 func sign(proxies string, msToken string, payload interface{}) (string, string, error) {
 	response, err := emit.ClientBuilder().
 		//Proxies(proxies).
-		Method(http.MethodPost).
-		URL(SignURL).
+		POST(SignURL).
 		Query("msToken", msToken).
 		JHeader().
 		Body(payload).
@@ -251,7 +527,7 @@ func sign(proxies string, msToken string, payload interface{}) (string, string, 
 func (c *Chat) reportMsToken() (string, error) {
 	response, err := emit.ClientBuilder().
 		//Proxies(c.opts.proxies).
-		URL(SignURL + "/report").
+		GET(SignURL + "/report").
 		DoS(http.StatusOK)
 	if err != nil {
 		return "", err
@@ -268,16 +544,13 @@ func (c *Chat) reportMsToken() (string, error) {
 
 	url := res.Data["url"]
 	delete(res.Data, "url")
-	r := emit.ClientBuilder().
+	response, err = emit.ClientBuilder().
 		Proxies(c.opts.proxies).
-		Method(http.MethodPost).
-		URL(fmt.Sprintf("%s/web/report", url)).
+		POST(fmt.Sprintf("%s/web/report", url)).
+		Query("msToken", c.msToken).
 		JHeader().
-		Body(res.Data)
-	if c.msToken != "" {
-		r.Query("msToken", c.msToken)
-	}
-	response, err = r.DoS(http.StatusOK)
+		Body(res.Data).
+		DoS(http.StatusOK)
 	if err != nil {
 		return "", err
 	}
@@ -306,8 +579,7 @@ func (c *Chat) getCon() (string, error) {
 
 	response, err := emit.ClientBuilder().
 		Proxies(c.opts.proxies).
-		Method(http.MethodPost).
-		URL(fmt.Sprintf("%s/get_message_list", BaseURL)).
+		POST(fmt.Sprintf("%s/get_message_list", BaseURL)).
 		Query("msToken", c.msToken).
 		Header("user-agent", userAgent).
 		Header("cookie", c.makeCookie()).
@@ -345,8 +617,7 @@ func (c *Chat) createSection(conversationId string) {
 
 	response, err := emit.ClientBuilder().
 		Proxies(c.opts.proxies).
-		Method(http.MethodPost).
-		URL(fmt.Sprintf("%s/create_section", BaseURL)).
+		POST(fmt.Sprintf("%s/create_section", BaseURL)).
 		Query("msToken", c.msToken).
 		Header("user-agent", userAgent).
 		Header("cookie", c.makeCookie()).
@@ -375,8 +646,7 @@ func (c *Chat) delCon(conversationId string) {
 
 	response, err := emit.ClientBuilder().
 		Proxies(c.opts.proxies).
-		Method(http.MethodPost).
-		URL(fmt.Sprintf("%s/clear_message", BaseURL)).
+		POST(fmt.Sprintf("%s/clear_message", BaseURL)).
 		Query("msToken", c.msToken).
 		Header("user-agent", userAgent).
 		Header("cookie", c.makeCookie()).
@@ -480,6 +750,35 @@ func IsLimit(content string) bool {
 		return true
 	}
 	return false
+}
+
+func FilesMessage(query string, urls ...string) (string, error) {
+	slice := []interface{}{
+		map[string]interface{}{
+			"type": "text",
+			"text": query,
+		},
+	}
+
+	if len(urls) > 0 {
+		for _, u := range urls {
+			slice = append(slice, map[string]interface{}{
+				"type": "image",
+				"image": map[string]interface{}{
+					"key": u,
+				},
+			})
+		}
+	}
+
+	dataBytes, err := json.Marshal(map[string]interface{}{
+		"item_list": slice,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return string(dataBytes), nil
 }
 
 func MergeMessages(messages []Message) string {

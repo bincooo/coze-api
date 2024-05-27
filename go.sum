@@ -1,7 +1,9 @@
 github.com/RomiChan/websocket v1.4.3-0.20220227141055-9b2c6168c9c5 h1:bBmmB7he0iVN4m5mcehfheeRUEer/Avo4ujnxI3uCqs=
 github.com/RomiChan/websocket v1.4.3-0.20220227141055-9b2c6168c9c5/go.mod h1:0UcFaCkhp6vZw6l5Dpq0Dp673CoF9GdvA8lTfst0GiU=
-github.com/bincooo/emit.io v0.0.0-20240524152819-cb8488ff2851 h1:fEv/NXYdggUXSKVIed04O3nfeHTD4unG/eyVJeXVKms=
-github.com/bincooo/emit.io v0.0.0-20240524152819-cb8488ff2851/go.mod h1:Dne/96gacvbrQnCnhL3rrHYT8GazOhoPESZEgdQXczU=
+github.com/bincooo/emit.io v0.0.0-20240526230324-a6e1e467eb61 h1:kQaeTZ1GfOg3EgZ3K6nd7TmW+xTEbOE02L/gXBI08hU=
+github.com/bincooo/emit.io v0.0.0-20240526230324-a6e1e467eb61/go.mod h1:Dne/96gacvbrQnCnhL3rrHYT8GazOhoPESZEgdQXczU=
+github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
+github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 golang.org/x/net v0.24.0 h1:1PcaxkF854Fu3+lvBIx5SYn9wRlBzzcnHZSiaFFAb0w=
 golang.org/x/net v0.24.0/go.mod h1:2Q7sJY5mzlzWjKtYUEXSlBWCdyaioyXzRB2RtU8KVE8=
 golang.org/x/sys v0.19.0 h1:q5f1RH2jigJ1MoAWp2KTp3gm5zAGFUTarQZ5U386+4o=

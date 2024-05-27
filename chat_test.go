@@ -62,7 +62,7 @@ func TestChat(t *testing.T) {
 	defer withTimeout()
 
 	//ch, err := chat.Reply(timeout, MergeMessages(messages))
-	ch, err := chat.Reply(timeout, "西红柿炒钢丝球这道菜怎么做")
+	ch, err := chat.Reply(timeout, Text, "西红柿炒钢丝球这道菜怎么做")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,4 +100,29 @@ func echo(ch chan string, t *testing.T) {
 		content += message[6:]
 	}
 	t.Log(content)
+}
+
+func TestUpload(t *testing.T) {
+	options := NewDefaultOptions("7372269419617697810", "1716490929018", 2, "http://127.0.0.1:7890")
+	chat := New(cookie, msToken, options)
+	timeout, withTimeout := context.WithTimeout(context.Background(), 120*time.Second)
+	defer withTimeout()
+
+	file, err := chat.Upload(timeout, "/Users/bincooo/Desktop/blob.jpg")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log(file)
+	message, err := FilesMessage("图里有什么", file)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ch, err := chat.Reply(timeout, Mix, message)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	echo(ch, t)
 }

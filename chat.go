@@ -27,8 +27,8 @@ const (
 
 var (
 	BaseURL = "https://www.coze.com/api/conversation"
-	//SignURL = "https://complete-mmx-coze-helper.hf.space"
-	SignURL = "http://127.0.0.1:3000"
+	SignURL = "https://complete-mmx-coze-helper.hf.space"
+	//SignURL = "http://127.0.0.1:3000"
 )
 
 type MessageType struct {

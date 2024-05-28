@@ -4,7 +4,7 @@ go 1.21.6
 
 require (
 	github.com/bincooo/emit.io v0.0.0-20240526230324-a6e1e467eb61
-	github.com/google/uuid v1.6.0
+	github.com/sirupsen/logrus v1.9.3
 )
 
 require (

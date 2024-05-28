@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/bincooo/emit.io"
+	"github.com/sirupsen/logrus"
 	"io"
 	"math/rand"
 	"net/http"
@@ -556,7 +557,7 @@ func (c *Chat) reportMsToken() (string, error) {
 	}
 
 	bs, _ := io.ReadAll(response.Body)
-	fmt.Println(string(bs))
+	logrus.Infof("%s", bs)
 
 	cookie := emit.GetCookie(response, "msToken")
 	if cookie == "" {
@@ -631,12 +632,12 @@ func (c *Chat) createSection(conversationId string) {
 		}).
 		DoS(http.StatusOK)
 	if err != nil {
-		fmt.Printf("createSection [%s] failed: %v\n", conversationId, err)
+		logrus.Errorf("createSection [%s] failed: %v\n", conversationId, err)
 		return
 	}
 
 	data, _ := io.ReadAll(response.Body)
-	fmt.Printf("%s\n", data)
+	logrus.Infof("%s\n", data)
 }
 
 func (c *Chat) delCon(conversationId string) {
@@ -660,12 +661,12 @@ func (c *Chat) delCon(conversationId string) {
 		}).
 		DoS(http.StatusOK)
 	if err != nil {
-		fmt.Printf("delCon [%s] failed: %v\n", conversationId, err)
+		logrus.Errorf("delCon [%s] failed: %v\n", conversationId, err)
 		return
 	}
 
 	data, _ := io.ReadAll(response.Body)
-	fmt.Printf("%s\n", data)
+	logrus.Infof("%s\n", data)
 }
 
 func (c *Chat) resolve(ctx context.Context, conversationId string, response *http.Response, ch chan string) {
@@ -690,6 +691,9 @@ func (c *Chat) resolve(ctx context.Context, conversationId string, response *htt
 		if prefix {
 			return false
 		}
+
+		logrus.Tracef("--------- ORIGINAL MESSAGE ---------")
+		logrus.Tracef("%s", data)
 
 		if bytes.HasPrefix(data, errorBefore) {
 			ch <- fmt.Sprintf("error: %s", data)

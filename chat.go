@@ -253,52 +253,39 @@ label:
 	}
 
 	// 2.1 签名
-	query := fmt.Sprintf("?Action=ApplyImageUpload&Version=2018-08-01&ServiceId=%s&FileSize=%d&FileExtension=%s", serviceId, len(file), fileExt)
-	response, err = emit.ClientBuilder().
-		//Proxies(c.opts.proxies).
-		Context(ctx).
-		POST(SignURL+"/upload-sign").
-		Query("mime", "imagex").
-		Query("accessKeyId", auth["access_key_id"].(string)).
-		Query("secretAccessKey", auth["secret_access_key"].(string)).
-		Query("sessionToken", auth["session_token"].(string)).
-		JHeader().
-		Body(map[string]interface{}{
-			"method":   "GET",
-			"url":      "https://" + host + "/" + query,
-			"timeout":  30000,
-			"pathname": "/",
-			"region":   "ap-singapore-1",
-			"params": map[string]interface{}{
-				"Action":        "ApplyImageUpload",
-				"Version":       "2018-08-01",
-				"ServiceId":     serviceId,
-				"FileSize":      len(file),
-				"FileExtension": fileExt,
-			},
-		}).
-		DoS(http.StatusOK)
+	url, headers, err := uploadSign(ctx, c.opts.proxies, struct {
+		method          string
+		sessionToken    string
+		accessKeyId     string
+		secretAccessKey string
+		host            string
+		serviceId       string
+		headers         map[string]interface{}
+		params          map[string]interface{}
+		body            map[string]interface{}
+	}{
+		method:          "GET",
+		sessionToken:    auth["session_token"].(string),
+		accessKeyId:     auth["access_key_id"].(string),
+		secretAccessKey: auth["secret_access_key"].(string),
+		host:            host,
+		serviceId:       serviceId,
+		params: map[string]interface{}{
+			"Action":        "ApplyImageUpload",
+			"ServiceId":     serviceId,
+			"FileSize":      len(fileBytes),
+			"FileExtension": fileExt,
+		},
+	})
 	if err != nil {
 		return "", err
 	}
-
-	obj, err = emit.ToMap(response)
-	if err != nil {
-		return "", err
-	}
-
-	if o, ok := obj["ok"]; !ok || !reflect.DeepEqual(o, true) {
-		return "", fmt.Errorf("upload failed: %s", obj["msg"])
-	}
-	obj = obj["data"].(map[string]interface{})
-	request := obj["request"].(map[string]interface{})
-	headers := request["headers"].(map[string]interface{})
 
 	// 2.2 ApplyImageUpload
 	response, err = emit.ClientBuilder().
 		Proxies(c.opts.proxies).
 		Context(ctx).
-		GET(request["url"].(string)).
+		GET(url).
 		Header("origin", "https://www.coze.com").
 		Header("referer", "https://www.coze.com/").
 		Header("X-Amz-Date", headers["X-Amz-Date"].(string)).
@@ -330,7 +317,7 @@ label:
 
 	// 3 上传文件
 	ieee := fmt.Sprintf("%x", crc32.ChecksumIEEE(fileBytes))
-	url := fmt.Sprintf("https://%s/upload/v1/%s", uploadAddress["UploadHost"], storeInfo["StoreUri"])
+	url = fmt.Sprintf("https://%s/upload/v1/%s", uploadAddress["UploadHost"], storeInfo["StoreUri"])
 	response, err = emit.ClientBuilder().
 		Proxies(c.opts.proxies).
 		Context(ctx).
@@ -359,58 +346,41 @@ label:
 		return "", fmt.Errorf("upload failed: %s", obj["message"])
 	}
 
-	// 2.1 签名
-	query = fmt.Sprintf("?Action=CommitImageUpload&Version=2018-08-01&ServiceId=%s", serviceId)
-	response, err = emit.ClientBuilder().
-		//Proxies(c.opts.proxies).
-		Context(ctx).
-		POST(SignURL+"/upload-sign").
-		Query("mime", "imagex").
-		Query("accessKeyId", auth["access_key_id"].(string)).
-		Query("secretAccessKey", auth["secret_access_key"].(string)).
-		Query("sessionToken", auth["session_token"].(string)).
-		JHeader().
-		Body(map[string]interface{}{
-			"method":   "POST",
-			"url":      "https://" + host + query,
-			"timeout":  30000,
-			"pathname": "/",
-			"region":   "ap-singapore-1",
-			"headers": map[string]interface{}{
-				"Content-Type": "application/json",
-			},
-			"params": map[string]interface{}{
-				"Action":    "CommitImageUpload",
-				"Version":   "2018-08-01",
-				"ServiceId": serviceId,
-			},
-			"custom": fmt.Sprintf(`{\"SessionKey\":\"%s\"}`, uploadAddress["SessionKey"]),
-			"body": map[string]interface{}{
-				"SessionKey": uploadAddress["SessionKey"],
-			},
-		}).
-		DoS(http.StatusOK)
-	if err != nil {
-		return "", err
-	}
-
-	obj, err = emit.ToMap(response)
-	if err != nil {
-		return "", err
-	}
-
-	if o, ok := obj["ok"]; !ok || !reflect.DeepEqual(o, true) {
-		return "", fmt.Errorf("upload failed: %s", obj["msg"])
-	}
-	obj = obj["data"].(map[string]interface{})
-	request = obj["request"].(map[string]interface{})
-	headers = request["headers"].(map[string]interface{})
+	// 4.1 签名
+	url, headers, err = uploadSign(ctx, c.opts.proxies, struct {
+		method          string
+		sessionToken    string
+		accessKeyId     string
+		secretAccessKey string
+		host            string
+		serviceId       string
+		headers         map[string]interface{}
+		params          map[string]interface{}
+		body            map[string]interface{}
+	}{
+		method:          "POST",
+		sessionToken:    auth["session_token"].(string),
+		accessKeyId:     auth["access_key_id"].(string),
+		secretAccessKey: auth["secret_access_key"].(string),
+		host:            host,
+		serviceId:       serviceId,
+		headers: map[string]interface{}{
+			"Content-Type": "application/json",
+		},
+		params: map[string]interface{}{
+			"Action":    "CommitImageUpload",
+			"ServiceId": serviceId,
+		},
+		body: map[string]interface{}{
+			"SessionKey": uploadAddress["SessionKey"],
+		},
+	})
 
 	// 4.2 CommitImageUpload
 	response, err = emit.ClientBuilder().
 		Proxies(c.opts.proxies).
 		Context(ctx).
-		POST(fmt.Sprintf("https://%s%s", host, query)).
+		POST(url).
 		Header("origin", "https://www.coze.com").
 		Header("referer", "https://www.coze.com/").
 		Header("X-Amz-Date", headers["X-Amz-Date"].(string)).
@@ -498,7 +468,85 @@ func (c *Chat) makePayload(conversationId string, t MessageType, query string) m
 	return data
 }
 
-func sign(proxies string, msToken string, payload interface{}) (string, string, error) {
+func uploadSign(ctx context.Context, proxies string, auth struct {
+	method          string
+	sessionToken    string
+	accessKeyId     string
+	secretAccessKey string
+	host            string
+	serviceId       string
+	headers         map[string]interface{}
+	params          map[string]interface{}
+	body            map[string]interface{}
+}) (url string, headers map[string]interface{}, err error) {
+	var query string
+	var action string
+	for k, v := range auth.params {
+		if k == "Action" {
+			action = v.(string)
+		}
+		query += fmt.Sprintf("%s=%v&", k, v)
+	}
+	if query == "" {
+		return "", nil, errors.New("empty auth.params")
+	}
+	if action == "" {
+		return "", nil, errors.New("empty action")
+	}
+
+	query += "Version=2018-08-01"
+	auth.params["Version"] = "2018-08-01"
+	obj := map[string]interface{}{
+		"method":   auth.method,
+		"url":      "https://" + auth.host + "/?" + query,
+		"timeout":  30000,
+		"pathname": "/",
+		"region":   "ap-singapore-1",
+		"params":   auth.params,
+	}
+
+	if auth.headers != nil {
+		obj["headers"] = auth.headers
+	}
+
+	if auth.body != nil {
+		bodyBytes, _ := json.Marshal(auth.body)
+		obj["custom"] = string(bodyBytes)
+		obj["body"] = auth.body
+	}
+
+	response, err := emit.ClientBuilder().
+		//Proxies(c.opts.proxies).
+		Context(ctx).
+		POST(SignURL+"/upload-sign").
+		Query("mime", "imagex").
+		Query("accessKeyId", auth.accessKeyId).
+		Query("secretAccessKey", auth.secretAccessKey).
+		Query("sessionToken", auth.sessionToken).
+		JHeader().
+		Body(obj).
+		DoS(http.StatusOK)
+	if err != nil {
+		return
+	}
+
+	obj, err = emit.ToMap(response)
+	if err != nil {
+		return
+	}
+
+	if o, ok := obj["ok"]; !ok || !reflect.DeepEqual(o, true) {
+		return "", nil, fmt.Errorf("upload sign failed: %s", obj["msg"])
+	}
+
+	obj = obj["data"].(map[string]interface{})
+	request := obj["request"].(map[string]interface{})
+	headers = request["headers"].(map[string]interface{})
+	url = strings.Replace(request["url"].(string), ".com/?", ".com?", -1)
+	return
+}
+
+func sign(proxies, msToken string, payload interface{}) (string, string, error) {
 	response, err := emit.ClientBuilder().
 		//Proxies(proxies).
 		POST(SignURL).

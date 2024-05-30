@@ -84,24 +84,6 @@ func TestImages(t *testing.T) {
 	t.Log(image)
 }
 
-func echo(ch chan string, t *testing.T) {
-	content := ""
-	for {
-		message, ok := <-ch
-		if !ok {
-			break
-		}
-
-		if strings.HasPrefix(message, "error:") {
-			t.Fatal(message)
-		}
-
-		t.Log(message)
-		content += message[6:]
-	}
-	t.Log(content)
-}
-
 func TestUpload(t *testing.T) {
 	options := NewDefaultOptions("7372269419617697810", "1716490929018", 2, "http://127.0.0.1:7890")
 	chat := New(cookie, msToken, options)
@@ -125,4 +107,22 @@ func TestUpload(t *testing.T) {
 	}
 
 	echo(ch, t)
+}
+
+func echo(ch chan string, t *testing.T) {
+	content := ""
+	for {
+		message, ok := <-ch
+		if !ok {
+			break
+		}
+
+		if strings.HasPrefix(message, "error:") {
+			t.Fatal(message)
+		}
+
+		t.Log(message)
+		content += message[6:]
+	}
+	t.Log(content)
 }

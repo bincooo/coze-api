@@ -233,6 +233,16 @@ func (c *Chat) BotInfo(ctx context.Context) (value map[string]interface{}, err e
 }
 
 func (c *Chat) DraftBot(ctx context.Context, info DraftInfo, system string) error {
+	if info.TopP == 0 {
+		info.TopP = 1
+	}
+	if info.Temperature == 0 {
+		info.Temperature = 0.75
+	}
+	if info.MaxTokens == 0 {
+		info.MaxTokens = 4096
+	}
+
 	value, err := structToMap(info)
 	if err != nil {
 		return err

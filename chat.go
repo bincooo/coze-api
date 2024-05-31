@@ -190,13 +190,48 @@ label:
 	return "", errors.New("images failed")
 }
 
-func (c *Chat) DraftBot(ctx context.Context, info DraftInfo, system string) error {
-	spaceId, err := c.getSpace()
+func (c *Chat) BotInfo(ctx context.Context) (value map[string]interface{}, err error) {
+	response, err := emit.ClientBuilder().
+		Context(ctx).
+		Proxies(c.opts.proxies).
+		POST("https://www.coze.com/api/draftbot/get_bot_info").
+		Query("msToken", c.msToken).
+		Header("user-agent", userAgent).
+		Header("cookie", c.makeCookie()).
+		Header("origin", "https://www.coze.com").
+		Header("referer", "https://www.coze.com/").
+		JHeader().
+		Body(map[string]string{
+			"bot_id":   c.opts.botId,
+			"space_id": c.opts.spaceId,
+		}).
+		DoC(emit.Status(http.StatusOK), emit.IsJSON)
 	if err != nil {
-		return err
+		return
 	}
 
-	c.opts.spaceId = spaceId
+	value, err = emit.ToMap(response)
+	if err != nil {
+		return
+	}
+
+	if code, ok := value["code"].(float64); !ok || code != 0 {
+		err = fmt.Errorf("fetch bot info failed: %s", value["msg"])
+		return
+	}
+
+	value = value["data"].(map[string]interface{})
+	info := value["work_info"].(map[string]interface{})
+	j := info["other_info"].(string)
+	if err = json.Unmarshal([]byte(j), &info); err != nil {
+		return
+	}
+
+	value["model"] = info["model"].(string)
+	return
+}
+
+func (c *Chat) DraftBot(ctx context.Context, info DraftInfo, system string) error {
 	value, err := structToMap(info)
 	if err != nil {
 		return err
@@ -214,7 +249,7 @@ func (c *Chat) DraftBot(ctx context.Context, info DraftInfo, system string) erro
 
 	payload := map[string]interface{}{
 		"bot_id":   c.opts.botId,
-		"space_id": spaceId,
+		"space_id": c.opts.spaceId,
 		"work_info": map[string]interface{}{
 			"other_info": string(valueBytes),
 		},
@@ -257,7 +292,7 @@ func (c *Chat) DraftBot(ctx context.Context, info DraftInfo, system string) erro
 
 	payload = map[string]interface{}{
 		"bot_id":   c.opts.botId,
-		"space_id": spaceId,
+		"space_id": c.opts.spaceId,
 		"work_info": map[string]interface{}{
 			"system_info_all": string(valueBytes),
 		},
@@ -721,7 +756,7 @@ func (c *Chat) reportMsToken() (string, error) {
 	return cookie, nil
 }
 
-func (c *Chat) getSpace() (spaceId string, err error) {
+func (c *Chat) GetSpace() (err error) {
 	response, err := emit.ClientBuilder().
 		Proxies(c.opts.proxies).
 		POST("https://www.coze.com/api/space/list").
@@ -739,26 +774,26 @@ func (c *Chat) getSpace() (spaceId string, err error) {
 
 	obj, err := emit.ToMap(response)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	if code, ok := obj["code"].(float64); !ok || code != 0 {
-		return "", errors.New("space no found")
+		return errors.New("space no found")
 	}
 
 	list := obj["bot_space_list"].([]interface{})
 	if len(list) == 0 {
-		return "", errors.New("space no found")
+		return errors.New("space no found")
 	}
 
 	for _, value := range list {
-		if s, ok := value.(map[string]interface{})["id"].(string); ok {
-			spaceId = s
+		if str, ok := value.(map[string]interface{})["id"].(string); ok {
+			c.opts.spaceId = str
 			return
 		}
 	}
 
-	return "", errors.New("space no found")
+	return errors.New("space no found")
 }
 
 func (c *Chat) getCon() (conversationId string, err error) {

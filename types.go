@@ -38,10 +38,10 @@ type signResponse[T any] struct {
 
 type DraftInfo struct {
 	Model            string  `json:"model"`
-	Temperature      float64 `json:"temperature"`
-	TopP             int     `json:"top_p"`
-	FrequencyPenalty int     `json:"frequency_penalty"`
-	PresencePenalty  int     `json:"presence_penalty"`
+	Temperature      float32 `json:"temperature"`
+	TopP             float32 `json:"top_p"`
+	FrequencyPenalty float32 `json:"frequency_penalty"`
+	PresencePenalty  float32 `json:"presence_penalty"`
 	MaxTokens        int     `json:"max_tokens"`
 	ResponseFormat   int     `json:"response_format"` // 0 Text 1 Markdown 2 JSON
 }

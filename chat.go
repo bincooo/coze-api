@@ -45,12 +45,13 @@ var (
 	Mix  = MessageType{"mix"}
 )
 
-func NewDefaultOptions(botId, version string, scene int, proxies string) Options {
+func NewDefaultOptions(botId, version string, scene int, owner bool, proxies string) Options {
 	return Options{
 		botId:   botId,
 		version: version,
 		scene:   scene,
 		proxies: proxies,
+		owner:   owner,
 	}
 }
 
@@ -203,7 +204,7 @@ func (c *Chat) BotInfo(ctx context.Context) (value map[string]interface{}, err e
 		JHeader().
 		Body(map[string]string{
 			"bot_id":   c.opts.botId,
-			"space_id": c.opts.spaceId,
+			"space_id": c.opts.version,
 		}).
 		DoC(emit.Status(http.StatusOK), emit.IsJSON)
 	if err != nil {
@@ -249,7 +250,7 @@ func (c *Chat) DraftBot(ctx context.Context, info DraftInfo, system string) erro
 
 	payload := map[string]interface{}{
 		"bot_id":   c.opts.botId,
-		"space_id": c.opts.spaceId,
+		"space_id": c.opts.version,
 		"work_info": map[string]interface{}{
 			"other_info": string(valueBytes),
 		},
@@ -292,7 +293,7 @@ func (c *Chat) DraftBot(ctx context.Context, info DraftInfo, system string) erro
 
 	payload = map[string]interface{}{
 		"bot_id":   c.opts.botId,
-		"space_id": c.opts.spaceId,
+		"space_id": c.opts.version,
 		"work_info": map[string]interface{}{
 			"system_info_all": string(valueBytes),
 		},
@@ -602,10 +603,12 @@ func (c *Chat) makePayload(conversationId string, t MessageType, query string) m
 		"content_type":     t.String(),
 	}
 
-	if c.opts.spaceId != "" {
+	if c.opts.owner {
 		data["draft_mode"] = true
-		data["space_id"] = c.opts.spaceId
+		data["space_id"] = c.opts.version
+		delete(data, "bot_version")
 	}
+
 	return data
 }
 
@@ -756,45 +759,45 @@ func (c *Chat) reportMsToken() (string, error) {
 	return cookie, nil
 }
 
-func (c *Chat) GetSpace() (err error) {
-	response, err := emit.ClientBuilder().
-		Proxies(c.opts.proxies).
-		POST("https://www.coze.com/api/space/list").
-		Query("msToken", c.msToken).
-		Header("user-agent", userAgent).
-		Header("cookie", c.makeCookie()).
-		Header("origin", "https://www.coze.com").
-		Header("referer", "https://www.coze.com/space/").
-		JHeader().
-		Body(map[string]interface{}{}).
-		DoC(emit.Status(http.StatusOK), emit.IsJSON)
-	if err != nil {
-		return
-	}
-
-	obj, err := emit.ToMap(response)
-	if err != nil {
-		return err
-	}
-
-	if code, ok := obj["code"].(float64); !ok || code != 0 {
-		return errors.New("space no found")
-	}
-
-	list := obj["bot_space_list"].([]interface{})
-	if len(list) == 0 {
-		return errors.New("space no found")
-	}
-
-	for _, value := range list {
-		if str, ok := value.(map[string]interface{})["id"].(string); ok {
-			c.opts.spaceId = str
-			return
-		}
-	}
-
-	return errors.New("space no found")
-}
+//func (c *Chat) GetSpace() (err error) {
+//	response, err := emit.ClientBuilder().
+//		Proxies(c.opts.proxies).
+//		POST("https://www.coze.com/api/space/list").
+//		Query("msToken", c.msToken).
+//		Header("user-agent", userAgent).
+//		Header("cookie", c.makeCookie()).
+//		Header("origin", "https://www.coze.com").
+//		Header("referer", "https://www.coze.com/space/").
+//		JHeader().
+//		Body(map[string]interface{}{}).
+//		DoC(emit.Status(http.StatusOK), emit.IsJSON)
+//	if err != nil {
+//		return
+//	}
+//
+//	obj, err := emit.ToMap(response)
+//	if err != nil {
+//		return err
+//	}
+//
+//	if code, ok := obj["code"].(float64); !ok || code != 0 {
+//		return errors.New("space no found")
+//	}
+//
+//	list := obj["bot_space_list"].([]interface{})
+//	if len(list) == 0 {
+//		return errors.New("space no found")
+//	}
+//
+//	for _, value := range list {
+//		if str, ok := value.(map[string]interface{})["id"].(string); ok {
+//			c.opts.spaceId = str
+//			return
+//		}
+//	}
+//
+//	return errors.New("space no found")
+//}
 
 func (c *Chat) getCon() (conversationId string, err error) {
 	obj := map[string]interface{}{

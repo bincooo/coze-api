@@ -11,7 +11,7 @@ type Options struct {
 	version string // 机器人版本
 	scene   int    // 场景？？
 	proxies string // 本地代理
-	spaceId string //
+	owner   bool   // 编辑模式
 }
 
 type Message struct {

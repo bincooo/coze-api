@@ -9,12 +9,12 @@ import (
 )
 
 const (
-	cookie  = "i18next=en; store-idc=alisg; store-country-code=hk; store-country-code-src=uid; g_state={\"i_l\":0}; d_ticket=ede8b406e453ed1009468cce57c1a7dd76a55; odin_tt=a9f766443c163717121b4e4da6dc36b3a4b2f5cdf0824ceb99589f032c5488474694af1a6266dd7de76b0e4b2bb65c2fd88286755131b2cc547091bdfd58c881; passport_auth_status=7559a9ca53c19c94096856a43c6dee97%2C584d4a6ad3160143363a4974b93f247e; passport_auth_status_ss=7559a9ca53c19c94096856a43c6dee97%2C584d4a6ad3160143363a4974b93f247e; sid_guard=0c93906b42bba2b9bc8cbb00057db83b%7C1716490784%7C5184000%7CMon%2C+22-Jul-2024+18%3A59%3A44+GMT; uid_tt=450336838679f644e9a6440393d4b0f46738610bfe4ea4ea0c263ea4eef9ae89; uid_tt_ss=450336838679f644e9a6440393d4b0f46738610bfe4ea4ea0c263ea4eef9ae89; sid_tt=0c93906b42bba2b9bc8cbb00057db83b; sessionid=0c93906b42bba2b9bc8cbb00057db83b; sessionid_ss=0c93906b42bba2b9bc8cbb00057db83b; sid_ucp_v1=1.0.0-KDgyNDBkN2I0MjJjNjY2ZmRmOTFiNmYxNjdmMGEzOGUyMTFiNmM3MWIKIAiQiJjUnoDRhWYQoKS-sgYY1J0fIAwwpoitsAY4CEASEAMaA3NnMSIgMGM5MzkwNmI0MmJiYTJiOWJjOGNiYjAwMDU3ZGI4M2I; ssid_ucp_v1=1.0.0-KDgyNDBkN2I0MjJjNjY2ZmRmOTFiNmYxNjdmMGEzOGUyMTFiNmM3MWIKIAiQiJjUnoDRhWYQoKS-sgYY1J0fIAwwpoitsAY4CEASEAMaA3NnMSIgMGM5MzkwNmI0MmJiYTJiOWJjOGNiYjAwMDU3ZGI4M2I; consent_cookie={%22analytics_and_performance%22:{%22active%22:false%2C%22disabled%22:false}}; s_v_web_id=verify_lwpo1iuk_v9n0yBiF_dbqe_4FSw_9Xrm_bR5LPL1dVUby; ttwid=1%7CgKywuI_SojgaArjs5s1tTHxIk9Mbut_IVl8AoXYZa_Y%7C1717116861%7C53e1d914fe9a0e67a313eb302c9e2fc62a701f840e6e8e39a12e21eadadeedde; msToken=fkCyx-7f7vp-nOYcSl0pOIVuNAwdM6oPGTmNCrBLreIhYRCS2-OgxMOcmvq7LmBmxdN5AO4XjRBxh8-kPhn3-GAdmEiY2wke_M2B-2gIZIUxqQUn2QeFeroPe-K0IP4=; msToken=fkCyx-7f7vp-nOYcSl0pOIVuNAwdM6oPGTmNCrBLreIhYRCS2-OgxMOcmvq7LmBmxdN5AO4XjRBxh8-kPhn3-GAdmEiY2wke_M2B-2gIZIUxqQUn2QeFeroPe-K0IP4="
+	cookie  = "xxx"
 	msToken = ""
 )
 
 func TestCookie(t *testing.T) {
-	options := NewDefaultOptions("7353047124357365778", "1712645567468", 2, "http://127.0.0.1:7890")
+	options := NewDefaultOptions("7353047124357365778", "1712645567468", 2, false, "http://127.0.0.1:7890")
 	chat := New(cookie, msToken, options)
 	t.Log(chat.makeCookie())
 }
@@ -33,7 +33,7 @@ func TestChats(t *testing.T) {
 }
 
 func TestChat(t *testing.T) {
-	options := NewDefaultOptions("7353047124357365778", "1712645567468", 2, "http://127.0.0.1:7890")
+	options := NewDefaultOptions("7353047124357365778", "1712645567468", 2, false, "http://127.0.0.1:7890")
 	chat := New(cookie, msToken, options)
 	//messages := []Message{
 	//	{
@@ -71,7 +71,7 @@ func TestChat(t *testing.T) {
 }
 
 func TestImages(t *testing.T) {
-	options := NewDefaultOptions("7353052833752694791", "1712016747307", 2, "http://127.0.0.1:7890")
+	options := NewDefaultOptions("7353052833752694791", "1712016747307", 2, false, "http://127.0.0.1:7890")
 	chat := New(cookie, msToken, options)
 	timeout, withTimeout := context.WithTimeout(context.Background(), 120*time.Second)
 	defer withTimeout()
@@ -85,7 +85,7 @@ func TestImages(t *testing.T) {
 }
 
 func TestUpload(t *testing.T) {
-	options := NewDefaultOptions("7372269419617697810", "1716490929018", 2, "http://127.0.0.1:7890")
+	options := NewDefaultOptions("7372269419617697810", "1716490929018", 2, false, "http://127.0.0.1:7890")
 	chat := New(cookie, msToken, options)
 	timeout, withTimeout := context.WithTimeout(context.Background(), 120*time.Second)
 	defer withTimeout()
@@ -110,15 +110,15 @@ func TestUpload(t *testing.T) {
 }
 
 func TestDraftBot(t *testing.T) {
-	options := NewDefaultOptions("7372269419617697810", "1716490929018", 4, "http://127.0.0.1:7890")
+	options := NewDefaultOptions("7372269419617697810", "7353038106104528914", 4, true, "http://127.0.0.1:7890")
 	chat := New(cookie, msToken, options)
 	timeout, withTimeout := context.WithTimeout(context.Background(), 120*time.Second)
 	defer withTimeout()
 
-	err := chat.GetSpace()
-	if err != nil {
-		t.Fatal(err)
-	}
+	//err := chat.GetSpace()
+	//if err != nil {
+	//	t.Fatal(err)
+	//}
 
 	info, err := chat.BotInfo(timeout)
 	if err != nil {

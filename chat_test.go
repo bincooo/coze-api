@@ -109,6 +109,34 @@ func TestUpload(t *testing.T) {
 	echo(ch, t)
 }
 
+func TestDraftBot(t *testing.T) {
+	options := NewDefaultOptions("7372269419617697810", "1716490929018", 4, "http://127.0.0.1:7890")
+	chat := New(cookie, msToken, options)
+	timeout, withTimeout := context.WithTimeout(context.Background(), 120*time.Second)
+	defer withTimeout()
+
+	// 此操作为全局配置，使用时需考虑多用户场景
+	err := chat.DraftBot(timeout, DraftInfo{
+		Model:            "1716293913", // 该id貌似是固定的？？
+		Temperature:      0.75,
+		TopP:             1,
+		FrequencyPenalty: 0,
+		PresencePenalty:  0,
+		MaxTokens:        4096,
+		ResponseFormat:   0,
+	}, "you are new bing copilot, your name is bing.")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ch, err := chat.Reply(timeout, Text, "你是谁？")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	echo(ch, t)
+}
+
 func echo(ch chan string, t *testing.T) {
 	content := ""
 	for {

@@ -190,6 +190,107 @@ label:
 	return "", errors.New("images failed")
 }
 
+func (c *Chat) DraftBot(ctx context.Context, info DraftInfo, system string) error {
+	spaceId, err := c.getSpace()
+	if err != nil {
+		return err
+	}
+
+	c.opts.spaceId = spaceId
+	value, err := structToMap(info)
+	if err != nil {
+		return err
+	}
+
+	value["model_style"] = 0
+	value["ShortMemPolicy"] = map[string]interface{}{
+		"HistoryRound": 3,
+	}
+
+	valueBytes, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+
+	payload := map[string]interface{}{
+		"bot_id":   c.opts.botId,
+		"space_id": spaceId,
+		"work_info": map[string]interface{}{
+			"other_info": string(valueBytes),
+		},
+	}
+
+	response, err := emit.ClientBuilder().
+		Context(ctx).
+		Proxies(c.opts.proxies).
+		POST("https://www.coze.com/api/draftbot/update").
+		Query("msToken", c.msToken).
+		Header("user-agent", userAgent).
+		Header("cookie", c.makeCookie()).
+		Header("origin", "https://www.coze.com").
+		Header("referer", "https://www.coze.com/").
+		JHeader().
+		Body(payload).
+		DoC(emit.Status(http.StatusOK), emit.IsJSON)
+	if err != nil {
+		return err
+	}
+
+	value, err = emit.ToMap(response)
+	if err != nil {
+		return err
+	}
+
+	if code, ok := value["code"].(float64); ok && code != 0 {
+		return errors.New("update info failed")
+	}
+
+	values := []map[string]interface{}{
+		{"prompt_type": 1, "data": system, "record_id": ""},
+		{"prompt_type": 2, "data": ""},
+		{"prompt_type": 3, "data": ""},
+	}
+	valueBytes, err = json.Marshal(values)
+	if err != nil {
+		return err
+	}
+
+	payload = map[string]interface{}{
+		"bot_id":   c.opts.botId,
+		"space_id": spaceId,
+		"work_info": map[string]interface{}{
+			"system_info_all": string(valueBytes),
+		},
+	}
+
+	response, err = emit.ClientBuilder().
+		Context(ctx).
+		Proxies(c.opts.proxies).
+		POST("https://www.coze.com/api/draftbot/update").
+		Query("msToken", c.msToken).
+		Header("user-agent", userAgent).
+		Header("cookie", c.makeCookie()).
+		Header("origin", "https://www.coze.com").
+		Header("referer", "https://www.coze.com/").
+		JHeader().
+		Body(payload).
+		DoC(emit.Status(http.StatusOK), emit.IsJSON)
+	if err != nil {
+		return err
+	}
+
+	value, err = emit.ToMap(response)
+	if err != nil {
+		return err
+	}
+
+	if code, ok := value["code"].(float64); ok && code != 0 {
+		return errors.New("update prompt failed")
+	}
+
+	return nil
+}
+
 // 文件上传
 func (c *Chat) Upload(ctx context.Context, file string) (string, error) {
 	// 啰里八嗦的代码，狗看了都摇头
@@ -465,6 +566,11 @@ func (c *Chat) makePayload(conversationId string, t MessageType, query string) m
 		"device_id":        randDID(),
 		"content_type":     t.String(),
 	}
+
+	if c.opts.spaceId != "" {
+		data["draft_mode"] = true
+		data["space_id"] = c.opts.spaceId
+	}
 	return data
 }
 
@@ -615,7 +721,47 @@ func (c *Chat) reportMsToken() (string, error) {
 	return cookie, nil
 }
 
-func (c *Chat) getCon() (string, error) {
+func (c *Chat) getSpace() (spaceId string, err error) {
+	response, err := emit.ClientBuilder().
+		Proxies(c.opts.proxies).
+		POST("https://www.coze.com/api/space/list").
+		Query("msToken", c.msToken).
+		Header("user-agent", userAgent).
+		Header("cookie", c.makeCookie()).
+		Header("origin", "https://www.coze.com").
+		Header("referer", "https://www.coze.com/space/").
+		JHeader().
+		Body(map[string]interface{}{}).
+		DoC(emit.Status(http.StatusOK), emit.IsJSON)
+	if err != nil {
+		return
+	}
+
+	obj, err := emit.ToMap(response)
+	if err != nil {
+		return "", err
+	}
+
+	if code, ok := obj["code"].(float64); !ok || code != 0 {
+		return "", errors.New("space no found")
+	}
+
+	list := obj["bot_space_list"].([]interface{})
+	if len(list) == 0 {
+		return "", errors.New("space no found")
+	}
+
+	for _, value := range list {
+		if s, ok := value.(map[string]interface{})["id"].(string); ok {
+			spaceId = s
+			return
+		}
+	}
+
+	return "", errors.New("space no found")
+}
+
+func (c *Chat) getCon() (conversationId string, err error) {
 	obj := map[string]interface{}{
 		"cursor":                      "0",
 		"count":                       15,
@@ -636,27 +782,22 @@ func (c *Chat) getCon() (string, error) {
 		Header("referer", "https://www.coze.com/store/bot").
 		JHeader().
 		Body(obj).
-		DoS(http.StatusOK)
+		DoC(emit.Status(http.StatusOK), emit.IsJSON)
+	if err != nil {
+		return
+	}
+
+	obj, err = emit.ToMap(response)
 	if err != nil {
 		return "", err
 	}
 
-	data, err := io.ReadAll(response.Body)
-	if err != nil {
-		return "", err
+	if code, ok := obj["code"].(float64); ok && code == 0 {
+		conversationId = obj["conversation_id"].(string)
+		return
 	}
 
-	var dict map[string]interface{}
-	err = json.Unmarshal(data, &dict)
-	if err != nil {
-		return "", err
-	}
-
-	if code, ok := dict["code"].(float64); ok && code == 0 {
-		return dict["conversation_id"].(string), nil
-	}
-
-	return "", fmt.Errorf("%s", data)
+	return "", fmt.Errorf("%s", obj["msg"])
 }
 
 func (c *Chat) createSection(conversationId string) {
@@ -874,4 +1015,13 @@ func randHex(num int) string {
 		buf = append(buf, bin[rand.Intn(binL-1)])
 	}
 	return string(buf)
+}
+
+func structToMap(obj interface{}) (value map[string]interface{}, err error) {
+	objBytes, err := json.Marshal(obj)
+	if err != nil {
+		return
+	}
+	err = json.Unmarshal(objBytes, &value)
+	return
 }

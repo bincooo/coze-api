@@ -99,6 +99,9 @@ func (c *Chat) Reply(ctx context.Context, t MessageType, query string) (chan str
 		Body(payload).
 		DoC(emit.Status(http.StatusOK), emit.IsSTREAM)
 	if err != nil {
+		if emit.IsJSON(response) == nil {
+			err = errors.New(emit.TextResponse(response))
+		}
 		return nil, err
 	}
 

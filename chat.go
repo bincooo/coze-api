@@ -64,6 +64,10 @@ func New(cookie, msToken string, opts Options) Chat {
 }
 
 func (c *Chat) Reply(ctx context.Context, t MessageType, query string) (chan string, error) {
+	if c.webSdk {
+		return c.replyWebSdk(ctx, t, c.messages, query)
+	}
+
 	if c.msToken == "" {
 		msToken, err := c.reportMsToken()
 		if err != nil {
@@ -109,6 +113,49 @@ func (c *Chat) Reply(ctx context.Context, t MessageType, query string) (chan str
 	go c.resolve(ctx, conversationId, response, ch)
 	go c.createSection(conversationId)
 
+	return ch, nil
+}
+
+func (c *Chat) replyWebSdk(ctx context.Context, t MessageType, histories []interface{}, query string) (chan string, error) {
+	if c.msToken == "" {
+		msToken, err := c.reportMsToken()
+		if err != nil {
+			return nil, err
+		}
+		c.msToken = msToken
+	}
+
+	conversationId := randHex(21)
+	payload := c.makePayload2(conversationId, t, histories, query)
+	// 签名
+	//bogus, signature, err := sign(c.opts.proxies, c.msToken, payload)
+	//if err != nil {
+	//	return nil, err
+	//}
+
+	response, err := emit.ClientBuilder().
+		Context(ctx).
+		Proxies(c.opts.proxies).
+		POST("https://api.coze.com/open_api/v1/web_chat").
+		Query("msToken", c.msToken).
+		//Query("X-Bogus", bogus).
+		//Query("_signature", signature).
+		Header("user-agent", userAgent).
+		Header("cookie", c.makeCookie()).
+		Header("origin", "https://api.coze.com").
+		Header("referer", "https://api.coze.com/open-platform/sdk/chatapp").
+		JHeader().
+		Body(payload).
+		DoC(emit.Status(http.StatusOK), emit.IsSTREAM)
+	if err != nil {
+		if emit.IsJSON(response) == nil {
+			err = errors.New(emit.TextResponse(response))
+		}
+		return nil, err
+	}
+
+	ch := make(chan string)
+	go c.resolve(ctx, "", response, ch)
 	return ch, nil
 }
 
@@ -192,6 +239,12 @@ label:
 	}
 
 	return "", errors.New("images failed")
+}
+
+func (c *Chat) WebSdk(messages []interface{}) *Chat {
+	c.webSdk = true
+	c.messages = messages
+	return c
 }
 
 func (c *Chat) BotInfo(ctx context.Context) (value map[string]interface{}, err error) {
@@ -625,6 +678,33 @@ func (c *Chat) makePayload(conversationId string, t MessageType, query string) m
 	return data
 }
 
+func (c *Chat) makePayload2(conversationId string, t MessageType, histories []interface{}, query string) map[string]interface{} {
+	data := map[string]interface{}{
+		//"content_type":     "text",
+		"query":            query,
+		"local_message_id": randHex(21),
+		"extra":            make(map[string]string),
+		"scene":            c.opts.scene,
+		"bot_id":           c.opts.botId,
+		"conversation_id":  conversationId,
+		"draft_mode":       false,
+		"stream":           true,
+		"chat_history":     histories,
+		"mention_list":     make([]string, 0),
+		"device_id":        randDID(),
+		"content_type":     t.String(),
+		"user":             "925b350b3f62468594d6498793408441",
+	}
+
+	if c.opts.owner {
+		data["draft_mode"] = true
+		data["space_id"] = c.opts.version
+		delete(data, "bot_version")
+	}
+
+	return data
+}
+
 func uploadSign(ctx context.Context, proxies string, auth struct {
 	method          string
 	sessionToken    string
@@ -1023,6 +1103,48 @@ func FilesMessage(query string, urls ...string) (string, error) {
 	}
 
 	return string(dataBytes), nil
+}
+
+func (c *Chat) TransferMessages(messages []Message) (result []interface{}) {
+	result = make([]interface{}, 0)
+	condition := func(role string) string {
+		switch role {
+		case "assistant":
+			return role
+		default:
+			return "user"
+		}
+	}
+
+	for index, message := range messages {
+		mid := randDID()
+		messageT := "ack"
+		if message.Role == "assistant" {
+			messageT = "answer"
+		}
+
+		result = append(result, map[string]interface{}{
+			"bot_id":       c.opts.botId,
+			"content":      message.Content,
+			"content_obj":  message.Content,
+			"content_type": "text",
+			"extra_info": map[string]string{
+				"local_message_id": randHex(21),
+				// more ...
+			},
+			"index":     index,
+			"is_finish": true,
+			//"logId":        "20240607005905BF4F17BE43B37D011A9A",
+			"mention_list": make([]string, 0),
+			"message_id":   mid,
+			"preset_bot":   "",
+			"reply_id":     mid,
+			"role":         condition(message.Role),
+			"section_id":   "999",
+			"type":         messageT,
+		})
+	}
+	return
 }
 
 func MergeMessages(messages []Message) string {

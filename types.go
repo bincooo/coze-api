@@ -1,9 +1,11 @@
 package coze
 
 type Chat struct {
-	cookie  string
-	msToken string
-	opts    Options
+	cookie   string
+	msToken  string
+	opts     Options
+	webSdk   bool
+	messages []interface{}
 }
 
 type Options struct {

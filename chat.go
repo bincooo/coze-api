@@ -125,8 +125,10 @@ func (c *Chat) replyWebSdk(ctx context.Context, t MessageType, histories []inter
 		c.msToken = msToken
 	}
 
-	conversationId := randHex(21)
-	payload := c.makePayload2(conversationId, t, histories, query)
+	payload, err := c.makeWebSdkPayload(ctx, t, histories, query)
+	if err != nil {
+		return nil, err
+	}
 	// 签名
 	//bogus, signature, err := sign(c.opts.proxies, c.msToken, payload)
 	//if err != nil {
@@ -678,7 +680,31 @@ func (c *Chat) makePayload(conversationId string, t MessageType, query string) m
 	return data
 }
 
-func (c *Chat) makePayload2(conversationId string, t MessageType, histories []interface{}, query string) map[string]interface{} {
+func (c *Chat) makeWebSdkPayload(ctx context.Context, t MessageType, histories []interface{}, query string) (map[string]interface{}, error) {
+	if c.user == "" {
+		response, err := emit.ClientBuilder().
+			Context(ctx).
+			Proxies(c.opts.proxies).
+			GET("https://api.coze.com/open_api/v1/bot/onboarding").
+			Query("source", "web_sdk").
+			Query("bot_id", c.opts.botId).
+			Query("msToken", c.msToken).
+			DoC(emit.Status(http.StatusOK), emit.IsJSON)
+		if err != nil {
+			return nil, err
+		}
+
+		obj, err := emit.ToMap(response)
+		if err != nil {
+			return nil, err
+		}
+		if code, ok := obj["code"].(float64); ok && code != 0 {
+			return nil, fmt.Errorf("%v", obj["msg"])
+		}
+
+		c.user = obj["user_id"].(string)
+	}
+
 	data := map[string]interface{}{
 		//"content_type":     "text",
 		"query":            query,
@@ -686,23 +712,16 @@ func (c *Chat) makePayload2(conversationId string, t MessageType, histories []in
 		"extra":            make(map[string]string),
 		"scene":            c.opts.scene,
 		"bot_id":           c.opts.botId,
-		"conversation_id":  conversationId,
+		"conversation_id":  randHex(21),
 		"draft_mode":       false,
 		"stream":           true,
 		"chat_history":     histories,
 		"mention_list":     make([]string, 0),
 		"device_id":        randDID(),
 		"content_type":     t.String(),
-		"user":             "925b350b3f62468594d6498793408441",
+		"user":             c.user,
 	}
-
-	if c.opts.owner {
-		data["draft_mode"] = true
-		data["space_id"] = c.opts.version
-		delete(data, "bot_version")
-	}
-
-	return data
+	return data, nil
 }
 
 func uploadSign(ctx context.Context, proxies string, auth struct {

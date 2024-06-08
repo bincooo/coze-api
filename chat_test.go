@@ -59,8 +59,8 @@ func TestChat(t *testing.T) {
 	//	},
 	//}
 
-	timeout, withTimeout := context.WithTimeout(context.Background(), 120*time.Second)
-	defer withTimeout()
+	timeout, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
 
 	//ch, err := chat.Reply(timeout, MergeMessages(messages))
 
@@ -99,8 +99,8 @@ func TestChat2(t *testing.T) {
 		//},
 	}
 
-	timeout, withTimeout := context.WithTimeout(context.Background(), 120*time.Second)
-	defer withTimeout()
+	timeout, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
 
 	//ch, err := chat.Reply(timeout, MergeMessages(messages))
 
@@ -116,8 +116,8 @@ func TestChat2(t *testing.T) {
 func TestImages(t *testing.T) {
 	options := NewDefaultOptions("7353052833752694791", "1712016747307", 2, false, "http://127.0.0.1:7890")
 	chat := New(cookie, msToken, options)
-	timeout, withTimeout := context.WithTimeout(context.Background(), 120*time.Second)
-	defer withTimeout()
+	timeout, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
 
 	image, err := chat.Images(timeout, "画一个二次元猫娘，1girl")
 	if err != nil {
@@ -130,8 +130,8 @@ func TestImages(t *testing.T) {
 func TestUpload(t *testing.T) {
 	options := NewDefaultOptions("7372269419617697810", "1716490929018", 2, false, "http://127.0.0.1:7890")
 	chat := New(cookie, msToken, options)
-	timeout, withTimeout := context.WithTimeout(context.Background(), 120*time.Second)
-	defer withTimeout()
+	timeout, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
 
 	file, err := chat.Upload(timeout, "/Users/bincooo/Desktop/blob.jpg")
 	if err != nil {
@@ -155,8 +155,8 @@ func TestUpload(t *testing.T) {
 func TestDraftBot(t *testing.T) {
 	options := NewDefaultOptions("7372269419617697810", "7353038106104528914", 4, true, "http://127.0.0.1:7890")
 	chat := New(cookie, msToken, options)
-	timeout, withTimeout := context.WithTimeout(context.Background(), 120*time.Second)
-	defer withTimeout()
+	timeout, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
 
 	//err := chat.GetSpace()
 	//if err != nil {

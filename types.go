@@ -6,6 +6,7 @@ type Chat struct {
 	opts     Options
 	webSdk   bool
 	messages []interface{}
+	user     string
 }
 
 type Options struct {

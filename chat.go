@@ -250,6 +250,10 @@ func (c *Chat) WebSdk(messages []interface{}) *Chat {
 }
 
 func (c *Chat) BotInfo(ctx context.Context) (value map[string]interface{}, err error) {
+	retry := 3
+label:
+
+	retry--
 	response, err := emit.ClientBuilder().
 		Context(ctx).
 		Proxies(c.opts.proxies).
@@ -266,16 +270,25 @@ func (c *Chat) BotInfo(ctx context.Context) (value map[string]interface{}, err e
 		}).
 		DoC(emit.Status(http.StatusOK), emit.IsJSON)
 	if err != nil {
+		if retry > 0 {
+			goto label
+		}
 		return
 	}
 
 	value, err = emit.ToMap(response)
 	if err != nil {
+		if retry > 0 {
+			goto label
+		}
 		return
 	}
 
 	if code, ok := value["code"].(float64); !ok || code != 0 {
 		err = fmt.Errorf("fetch bot info failed: %s", value["msg"])
+		if retry > 0 {
+			goto label
+		}
 		return
 	}
 
@@ -283,6 +296,9 @@ func (c *Chat) BotInfo(ctx context.Context) (value map[string]interface{}, err e
 	info := value["work_info"].(map[string]interface{})
 	j := info["other_info"].(string)
 	if err = json.Unmarshal([]byte(j), &info); err != nil {
+		if retry > 0 {
+			goto label
+		}
 		return
 	}
 

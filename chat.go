@@ -83,12 +83,12 @@ func (c *Chat) Reply(ctx context.Context, t MessageType, query string) (chan str
 
 	payload := c.makePayload(conversationId, t, query)
 	// 签名
-	bogus, signature, err := sign(c.opts.proxies, c.msToken, payload)
+	bogus, signature, err := sign(c.opts.proxies, c.msToken, payload, c.session)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := emit.ClientBuilder().
+	response, err := emit.ClientBuilder(c.session).
 		Context(ctx).
 		Proxies(c.opts.proxies).
 		POST(fmt.Sprintf("%s/chat", BaseURL)).
@@ -135,7 +135,7 @@ func (c *Chat) replyWebSdk(ctx context.Context, t MessageType, histories []inter
 	//	return nil, err
 	//}
 
-	response, err := emit.ClientBuilder().
+	response, err := emit.ClientBuilder(c.session).
 		Context(ctx).
 		Proxies(c.opts.proxies).
 		POST("https://api.coze.com/open_api/v1/web_chat").
@@ -179,7 +179,7 @@ func (c *Chat) Images(ctx context.Context, prompt string) (string, error) {
 	payload := c.makePayload(conversationId, Text, query)
 
 	// 签名
-	bogus, signature, err := sign(c.opts.proxies, c.msToken, payload)
+	bogus, signature, err := sign(c.opts.proxies, c.msToken, payload, c.session)
 	if err != nil {
 		return "", err
 	}
@@ -188,7 +188,7 @@ func (c *Chat) Images(ctx context.Context, prompt string) (string, error) {
 label:
 
 	retry--
-	response, err := emit.ClientBuilder().
+	response, err := emit.ClientBuilder(c.session).
 		Context(ctx).
 		Proxies(c.opts.proxies).
 		POST(fmt.Sprintf("%s/chat", BaseURL)).
@@ -243,6 +243,10 @@ label:
 	return "", errors.New("images failed")
 }
 
+func (c *Chat) Session(session *emit.Session) {
+	c.session = session
+}
+
 func (c *Chat) WebSdk(messages []interface{}) *Chat {
 	c.webSdk = true
 	c.messages = messages
@@ -254,7 +258,7 @@ func (c *Chat) BotInfo(ctx context.Context) (value map[string]interface{}, err e
 label:
 
 	retry--
-	response, err := emit.ClientBuilder().
+	response, err := emit.ClientBuilder(c.session).
 		Context(ctx).
 		Proxies(c.opts.proxies).
 		POST("https://www.coze.com/api/draftbot/get_bot_info").
@@ -340,7 +344,7 @@ func (c *Chat) DraftBot(ctx context.Context, info DraftInfo, system string) erro
 		},
 	}
 
-	response, err := emit.ClientBuilder().
+	response, err := emit.ClientBuilder(c.session).
 		Context(ctx).
 		Proxies(c.opts.proxies).
 		POST("https://www.coze.com/api/draftbot/update").
@@ -383,7 +387,7 @@ func (c *Chat) DraftBot(ctx context.Context, info DraftInfo, system string) erro
 		},
 	}
 
-	response, err = emit.ClientBuilder().
+	response, err = emit.ClientBuilder(c.session).
 		Context(ctx).
 		Proxies(c.opts.proxies).
 		POST("https://www.coze.com/api/draftbot/update").
@@ -428,7 +432,7 @@ label:
 	payload := map[string]string{
 		"scene": "bot_task",
 	}
-	bogus, signature, err := sign(c.opts.proxies, c.msToken, payload)
+	bogus, signature, err := sign(c.opts.proxies, c.msToken, payload, c.session)
 	if err != nil {
 		return "", err
 	}
@@ -439,7 +443,7 @@ label:
 	}
 
 	// 1. 下载凭证
-	response, err := emit.ClientBuilder().
+	response, err := emit.ClientBuilder(c.session).
 		Proxies(c.opts.proxies).
 		Context(ctx).
 		POST("https://www.coze.com/api/playground/upload/auth_token").
@@ -474,7 +478,7 @@ label:
 	}
 
 	// 2.1 签名
-	url, headers, err := uploadSign(ctx, c.opts.proxies, struct {
+	url, headers, err := uploadSign(ctx, c.opts.proxies, c.session, struct {
 		method          string
 		sessionToken    string
 		accessKeyId     string
@@ -503,7 +507,7 @@ label:
 	}
 
 	// 2.2 ApplyImageUpload
-	response, err = emit.ClientBuilder().
+	response, err = emit.ClientBuilder(c.session).
 		Proxies(c.opts.proxies).
 		Context(ctx).
 		GET(url).
@@ -539,7 +543,7 @@ label:
 	// 3 上传文件
 	ieee := fmt.Sprintf("%x", crc32.ChecksumIEEE(fileBytes))
 	url = fmt.Sprintf("https://%s/upload/v1/%s", uploadAddress["UploadHost"], storeInfo["StoreUri"])
-	response, err = emit.ClientBuilder().
+	response, err = emit.ClientBuilder(c.session).
 		Proxies(c.opts.proxies).
 		Context(ctx).
 		POST(url).
@@ -568,7 +572,7 @@ label:
 	}
 
 	// 4.1 签名
-	url, headers, err = uploadSign(ctx, c.opts.proxies, struct {
+	url, headers, err = uploadSign(ctx, c.opts.proxies, c.session, struct {
 		method          string
 		sessionToken    string
 		accessKeyId     string
@@ -598,7 +602,7 @@ label:
 	})
 
 	// 4.2 CommitImageUpload
-	response, err = emit.ClientBuilder().
+	response, err = emit.ClientBuilder(c.session).
 		Proxies(c.opts.proxies).
 		Context(ctx).
 		POST(url).
@@ -698,7 +702,7 @@ func (c *Chat) makePayload(conversationId string, t MessageType, query string) m
 
 func (c *Chat) makeWebSdkPayload(ctx context.Context, t MessageType, histories []interface{}, query string) (map[string]interface{}, error) {
 	if c.user == "" {
-		response, err := emit.ClientBuilder().
+		response, err := emit.ClientBuilder(c.session).
 			Context(ctx).
 			Proxies(c.opts.proxies).
 			GET("https://api.coze.com/open_api/v1/bot/onboarding").
@@ -740,7 +744,7 @@ func (c *Chat) makeWebSdkPayload(ctx context.Context, t MessageType, histories [
 	return data, nil
 }
 
-func uploadSign(ctx context.Context, proxies string, auth struct {
+func uploadSign(ctx context.Context, proxies string, session *emit.Session, auth struct {
 	method          string
 	sessionToken    string
 	accessKeyId     string
@@ -787,7 +791,7 @@ func uploadSign(ctx context.Context, proxies string, auth struct {
 		obj["body"] = auth.body
 	}
 
-	response, err := emit.ClientBuilder().
+	response, err := emit.ClientBuilder(session).
 		//Proxies(c.opts.proxies).
 		Context(ctx).
 		POST(SignURL+"/upload-sign").
@@ -818,8 +822,8 @@ func uploadSign(ctx context.Context, proxies string, auth struct {
 	return
 }
 
-func sign(proxies, msToken string, payload interface{}) (string, string, error) {
-	response, err := emit.ClientBuilder().
+func sign(proxies, msToken string, payload interface{}, session *emit.Session) (string, string, error) {
+	response, err := emit.ClientBuilder(session).
 		//Proxies(proxies).
 		POST(SignURL).
 		Query("msToken", msToken).
@@ -846,7 +850,7 @@ func sign(proxies, msToken string, payload interface{}) (string, string, error) 
 }
 
 func (c *Chat) reportMsToken() (string, error) {
-	response, err := emit.ClientBuilder().
+	response, err := emit.ClientBuilder(c.session).
 		//Proxies(c.opts.proxies).
 		GET(SignURL + "/report").
 		DoS(http.StatusOK)
@@ -865,7 +869,7 @@ func (c *Chat) reportMsToken() (string, error) {
 
 	url := res.Data["url"]
 	delete(res.Data, "url")
-	response, err = emit.ClientBuilder().
+	response, err = emit.ClientBuilder(c.session).
 		Proxies(c.opts.proxies).
 		POST(fmt.Sprintf("%s/web/report", url)).
 		Query("msToken", c.msToken).
@@ -938,7 +942,7 @@ func (c *Chat) getCon() (conversationId string, err error) {
 		"insert_history_message_list": make([]string, 0),
 	}
 
-	response, err := emit.ClientBuilder().
+	response, err := emit.ClientBuilder(c.session).
 		Proxies(c.opts.proxies).
 		POST(fmt.Sprintf("%s/get_message_list", BaseURL)).
 		Query("msToken", c.msToken).
@@ -971,7 +975,7 @@ func (c *Chat) createSection(conversationId string) {
 		return
 	}
 
-	response, err := emit.ClientBuilder().
+	response, err := emit.ClientBuilder(c.session).
 		Proxies(c.opts.proxies).
 		POST(fmt.Sprintf("%s/create_section", BaseURL)).
 		Query("msToken", c.msToken).
@@ -1000,7 +1004,7 @@ func (c *Chat) delCon(conversationId string) {
 		return
 	}
 
-	response, err := emit.ClientBuilder().
+	response, err := emit.ClientBuilder(c.session).
 		Proxies(c.opts.proxies).
 		POST(fmt.Sprintf("%s/clear_message", BaseURL)).
 		Query("msToken", c.msToken).

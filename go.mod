@@ -3,7 +3,7 @@ module github.com/bincooo/coze-api
 go 1.21.6
 
 require (
-	github.com/bincooo/emit.io v0.0.0-20240530174536-ed3f9ef9eaa9
+	github.com/bincooo/emit.io v0.0.0-20240619170924-d54017c56b6c
 	github.com/sirupsen/logrus v1.9.3
 )
 

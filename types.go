@@ -1,5 +1,7 @@
 package coze
 
+import "github.com/bincooo/emit.io"
+
 type Chat struct {
 	cookie   string
 	msToken  string
@@ -7,6 +9,8 @@ type Chat struct {
 	webSdk   bool
 	messages []interface{}
 	user     string
+
+	session *emit.Session
 }
 
 type Options struct {

@@ -281,6 +281,7 @@ label:
 	}
 
 	value, err = emit.ToMap(response)
+	_ = response.Body.Close()
 	if err != nil {
 		if retry > 0 {
 			goto label
@@ -361,6 +362,7 @@ func (c *Chat) DraftBot(ctx context.Context, info DraftInfo, system string) erro
 	}
 
 	value, err = emit.ToMap(response)
+	_ = response.Body.Close()
 	if err != nil {
 		return err
 	}
@@ -404,6 +406,7 @@ func (c *Chat) DraftBot(ctx context.Context, info DraftInfo, system string) erro
 	}
 
 	value, err = emit.ToMap(response)
+	_ = response.Body.Close()
 	if err != nil {
 		return err
 	}
@@ -462,6 +465,7 @@ label:
 	}
 
 	obj, err := emit.ToMap(response)
+	_ = response.Body.Close()
 	if err != nil {
 		return "", err
 	}
@@ -523,6 +527,7 @@ label:
 	}
 
 	obj, err = emit.ToMap(response)
+	_ = response.Body.Close()
 	if err != nil {
 		return "", err
 	}
@@ -562,6 +567,7 @@ label:
 	}
 
 	obj, err = emit.ToMap(response)
+	_ = response.Body.Close()
 	if err != nil {
 		return "", err
 	}
@@ -623,6 +629,7 @@ label:
 	}
 
 	obj, err = emit.ToMap(response)
+	_ = response.Body.Close()
 	if err != nil {
 		return "", err
 	}
@@ -715,6 +722,7 @@ func (c *Chat) makeWebSdkPayload(ctx context.Context, t MessageType, histories [
 		}
 
 		obj, err := emit.ToMap(response)
+		_ = response.Body.Close()
 		if err != nil {
 			return nil, err
 		}
@@ -807,6 +815,7 @@ func uploadSign(ctx context.Context, proxies string, session *emit.Session, auth
 	}
 
 	obj, err = emit.ToMap(response)
+	_ = response.Body.Close()
 	if err != nil {
 		return
 	}
@@ -834,6 +843,7 @@ func sign(proxies, msToken string, payload interface{}, session *emit.Session) (
 		return "", "", fmt.Errorf("coze-sign: %v", err)
 	}
 
+	defer response.Body.Close()
 	var res signResponse[map[string]interface{}]
 	if err = emit.ToObject(response, &res); err != nil {
 		return "", "", fmt.Errorf("coze-sign: %s", err)
@@ -859,7 +869,9 @@ func (c *Chat) reportMsToken() (string, error) {
 	}
 
 	var res signResponse[map[string]interface{}]
-	if err = emit.ToObject(response, &res); err != nil {
+	err = emit.ToObject(response, &res)
+	_ = response.Body.Close()
+	if err != nil {
 		return "", err
 	}
 
@@ -880,8 +892,8 @@ func (c *Chat) reportMsToken() (string, error) {
 		return "", err
 	}
 
-	bs, _ := io.ReadAll(response.Body)
-	logrus.Infof("%s", bs)
+	logrus.Infof("%s", emit.TextResponse(response))
+	_ = response.Body.Close()
 
 	cookie := emit.GetCookie(response, "msToken")
 	if cookie == "" {
@@ -958,6 +970,7 @@ func (c *Chat) getCon() (conversationId string, err error) {
 	}
 
 	obj, err = emit.ToMap(response)
+	_ = response.Body.Close()
 	if err != nil {
 		return "", err
 	}
@@ -995,8 +1008,8 @@ func (c *Chat) createSection(conversationId string) {
 		return
 	}
 
-	data, _ := io.ReadAll(response.Body)
-	logrus.Infof("%s\n", data)
+	logrus.Infof("%s\n", emit.TextResponse(response))
+	_ = response.Body.Close()
 }
 
 func (c *Chat) delCon(conversationId string) {
@@ -1024,8 +1037,8 @@ func (c *Chat) delCon(conversationId string) {
 		return
 	}
 
-	data, _ := io.ReadAll(response.Body)
-	logrus.Infof("%s\n", data)
+	logrus.Infof("%s\n", emit.TextResponse(response))
+	_ = response.Body.Close()
 }
 
 func (c *Chat) resolve(ctx context.Context, conversationId string, response *http.Response, ch chan string) {
@@ -1034,6 +1047,7 @@ func (c *Chat) resolve(ctx context.Context, conversationId string, response *htt
 	errorBefore := []byte("{\"code\":")
 	defer close(ch)
 	defer c.delCon(conversationId)
+	defer response.Body.Close()
 
 	r := bufio.NewReader(response.Body)
 	// 继续执行返回false

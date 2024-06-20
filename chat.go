@@ -83,7 +83,7 @@ func (c *Chat) Reply(ctx context.Context, t MessageType, query string) (chan str
 
 	payload := c.makePayload(conversationId, t, query)
 	// 签名
-	bogus, signature, err := sign(c.opts.proxies, c.msToken, payload, c.session)
+	bogus, signature, err := c.sign(payload)
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +179,7 @@ func (c *Chat) Images(ctx context.Context, prompt string) (string, error) {
 	payload := c.makePayload(conversationId, Text, query)
 
 	// 签名
-	bogus, signature, err := sign(c.opts.proxies, c.msToken, payload, c.session)
+	bogus, signature, err := c.sign(payload)
 	if err != nil {
 		return "", err
 	}
@@ -247,6 +247,10 @@ func (c *Chat) Session(session *emit.Session) {
 	c.session = session
 }
 
+func (c *Chat) ConnectOption(connOpts *emit.ConnectOption) {
+	c.connOpts = connOpts
+}
+
 func (c *Chat) WebSdk(messages []interface{}) *Chat {
 	c.webSdk = true
 	c.messages = messages
@@ -261,6 +265,7 @@ label:
 	response, err := emit.ClientBuilder(c.session).
 		Context(ctx).
 		Proxies(c.opts.proxies).
+		Option(c.connOpts).
 		POST("https://www.coze.com/api/draftbot/get_bot_info").
 		Query("msToken", c.msToken).
 		Header("user-agent", userAgent).
@@ -348,6 +353,7 @@ func (c *Chat) DraftBot(ctx context.Context, info DraftInfo, system string) erro
 	response, err := emit.ClientBuilder(c.session).
 		Context(ctx).
 		Proxies(c.opts.proxies).
+		Option(c.connOpts).
 		POST("https://www.coze.com/api/draftbot/update").
 		Query("msToken", c.msToken).
 		Header("user-agent", userAgent).
@@ -392,6 +398,7 @@ func (c *Chat) DraftBot(ctx context.Context, info DraftInfo, system string) erro
 	response, err = emit.ClientBuilder(c.session).
 		Context(ctx).
 		Proxies(c.opts.proxies).
+		Option(c.connOpts).
 		POST("https://www.coze.com/api/draftbot/update").
 		Query("msToken", c.msToken).
 		Header("user-agent", userAgent).
@@ -435,7 +442,7 @@ label:
 	payload := map[string]string{
 		"scene": "bot_task",
 	}
-	bogus, signature, err := sign(c.opts.proxies, c.msToken, payload, c.session)
+	bogus, signature, err := c.sign(payload)
 	if err != nil {
 		return "", err
 	}
@@ -449,6 +456,7 @@ label:
 	response, err := emit.ClientBuilder(c.session).
 		Proxies(c.opts.proxies).
 		Context(ctx).
+		Option(c.connOpts).
 		POST("https://www.coze.com/api/playground/upload/auth_token").
 		Query("msToken", c.msToken).
 		Query("X-Bogus", bogus).
@@ -482,7 +490,7 @@ label:
 	}
 
 	// 2.1 签名
-	url, headers, err := uploadSign(ctx, c.opts.proxies, c.session, struct {
+	url, headers, err := c.uploadSign(ctx, struct {
 		method          string
 		sessionToken    string
 		accessKeyId     string
@@ -514,6 +522,7 @@ label:
 	response, err = emit.ClientBuilder(c.session).
 		Proxies(c.opts.proxies).
 		Context(ctx).
+		Option(c.connOpts).
 		GET(url).
 		Header("origin", "https://www.coze.com").
 		Header("referer", "https://www.coze.com/").
@@ -551,6 +560,7 @@ label:
 	response, err = emit.ClientBuilder(c.session).
 		Proxies(c.opts.proxies).
 		Context(ctx).
+		Option(c.connOpts).
 		POST(url).
 		Header("origin", "https://www.coze.com").
 		Header("referer", "https://www.coze.com/").
@@ -578,7 +588,7 @@ label:
 	}
 
 	// 4.1 签名
-	url, headers, err = uploadSign(ctx, c.opts.proxies, c.session, struct {
+	url, headers, err = c.uploadSign(ctx, struct {
 		method          string
 		sessionToken    string
 		accessKeyId     string
@@ -611,6 +621,7 @@ label:
 	response, err = emit.ClientBuilder(c.session).
 		Proxies(c.opts.proxies).
 		Context(ctx).
+		Option(c.connOpts).
 		POST(url).
 		Header("origin", "https://www.coze.com").
 		Header("referer", "https://www.coze.com/").
@@ -711,6 +722,7 @@ func (c *Chat) makeWebSdkPayload(ctx context.Context, t MessageType, histories [
 	if c.user == "" {
 		response, err := emit.ClientBuilder(c.session).
 			Context(ctx).
+			Option(c.connOpts).
 			Proxies(c.opts.proxies).
 			GET("https://api.coze.com/open_api/v1/bot/onboarding").
 			Query("source", "web_sdk").
@@ -752,7 +764,7 @@ func (c *Chat) makeWebSdkPayload(ctx context.Context, t MessageType, histories [
 	return data, nil
 }
 
-func uploadSign(ctx context.Context, proxies string, session *emit.Session, auth struct {
+func (c *Chat) uploadSign(ctx context.Context, auth struct {
 	method          string
 	sessionToken    string
 	accessKeyId     string
@@ -799,9 +811,10 @@ func uploadSign(ctx context.Context, proxies string, session *emit.Session, auth
 		obj["body"] = auth.body
 	}
 
-	response, err := emit.ClientBuilder(session).
+	response, err := emit.ClientBuilder(c.session).
 		//Proxies(c.opts.proxies).
 		Context(ctx).
+		Option(c.connOpts).
 		POST(SignURL+"/upload-sign").
 		Query("mime", "imagex").
 		Query("accessKeyId", auth.accessKeyId).
@@ -831,11 +844,12 @@ func uploadSign(ctx context.Context, proxies string, session *emit.Session, auth
 	return
 }
 
-func sign(proxies, msToken string, payload interface{}, session *emit.Session) (string, string, error) {
-	response, err := emit.ClientBuilder(session).
+func (c *Chat) sign(payload interface{}) (string, string, error) {
+	response, err := emit.ClientBuilder(c.session).
 		//Proxies(proxies).
+		Option(c.connOpts).
 		POST(SignURL).
-		Query("msToken", msToken).
+		Query("msToken", c.msToken).
 		JHeader().
 		Body(payload).
 		DoS(http.StatusOK)
@@ -862,6 +876,7 @@ func sign(proxies, msToken string, payload interface{}, session *emit.Session) (
 func (c *Chat) reportMsToken() (string, error) {
 	response, err := emit.ClientBuilder(c.session).
 		//Proxies(c.opts.proxies).
+		Option(c.connOpts).
 		GET(SignURL + "/report").
 		DoS(http.StatusOK)
 	if err != nil {
@@ -883,6 +898,7 @@ func (c *Chat) reportMsToken() (string, error) {
 	delete(res.Data, "url")
 	response, err = emit.ClientBuilder(c.session).
 		Proxies(c.opts.proxies).
+		Option(c.connOpts).
 		POST(fmt.Sprintf("%s/web/report", url)).
 		Query("msToken", c.msToken).
 		JHeader().
@@ -956,6 +972,7 @@ func (c *Chat) getCon() (conversationId string, err error) {
 
 	response, err := emit.ClientBuilder(c.session).
 		Proxies(c.opts.proxies).
+		Option(c.connOpts).
 		POST(fmt.Sprintf("%s/get_message_list", BaseURL)).
 		Query("msToken", c.msToken).
 		Header("user-agent", userAgent).
@@ -990,6 +1007,7 @@ func (c *Chat) createSection(conversationId string) {
 
 	response, err := emit.ClientBuilder(c.session).
 		Proxies(c.opts.proxies).
+		Option(c.connOpts).
 		POST(fmt.Sprintf("%s/create_section", BaseURL)).
 		Query("msToken", c.msToken).
 		Header("user-agent", userAgent).
@@ -1019,6 +1037,7 @@ func (c *Chat) delCon(conversationId string) {
 
 	response, err := emit.ClientBuilder(c.session).
 		Proxies(c.opts.proxies).
+		Option(c.connOpts).
 		POST(fmt.Sprintf("%s/clear_message", BaseURL)).
 		Query("msToken", c.msToken).
 		Header("user-agent", userAgent).

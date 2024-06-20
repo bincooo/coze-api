@@ -10,7 +10,8 @@ type Chat struct {
 	messages []interface{}
 	user     string
 
-	session *emit.Session
+	session  *emit.Session
+	connOpts *emit.ConnectOption
 }
 
 type Options struct {

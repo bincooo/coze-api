@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,7 +24,7 @@ import (
 )
 
 const (
-	userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0"
+	userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0"
 )
 
 var (
@@ -159,6 +160,81 @@ func (c *Chat) replyWebSdk(ctx context.Context, t MessageType, histories []inter
 	ch := make(chan string)
 	go c.resolve(ctx, "", response, ch)
 	return ch, nil
+}
+
+// 查询可用额度
+func (c *Chat) QueryWebSdkCredits(ctx context.Context) (int, error) {
+	curr := time.Now()
+	t1 := time.Date(curr.Year(), curr.Month(), 1, 0, 0, 0, 0, time.UTC)
+	t2 := time.Date(curr.Year(), curr.Month(), 1, 0, 0, 0, 0, time.UTC).
+		AddDate(0, 1, 0).
+		Add(-time.Second)
+
+	if c.msToken == "" {
+		msToken, err := c.reportMsToken()
+		if err != nil {
+			return 0, err
+		}
+		c.msToken = msToken
+	}
+
+	response, err := emit.ClientBuilder(c.session).
+		Context(ctx).
+		Proxies(c.opts.proxies).
+		GET("https://www.coze.com/api/marketplace/trade/get_account_bills").
+		Query("account_type", "token").
+		Query("start_timestamp_ms", strconv.FormatInt(t1.UnixMilli(), 10)).
+		Query("end_timestamp_ms", strconv.FormatInt(t2.UnixMilli(), 10)).
+		Query("msToken", c.msToken).
+		Header("user-agent", userAgent).
+		Header("cookie", c.makeCookie()).
+		Header("referer", "https://www.coze.com/token").
+		DoC(emit.Status(http.StatusOK), emit.IsJSON)
+	if err != nil {
+		return 0, err
+	}
+
+	obj, err := emit.ToMap(response)
+	if err != nil {
+		return 0, err
+	}
+
+	if code, ok := obj["code"].(float64); !ok || code != 0 {
+		marshal, _ := json.Marshal(obj)
+		return 0, fmt.Errorf("%s", marshal)
+	}
+
+	inter, ok := obj["data"].(interface{})
+	if !ok {
+		return 0, errors.New("failed to fetch account free balance")
+	}
+
+	data, ok := inter.(map[string]interface{})["bill_details"]
+	if !ok {
+		return 0, errors.New("failed to fetch account free balance")
+	}
+
+	billDetails := data.([]interface{})
+	if len(billDetails) == 0 {
+		return 0, errors.New("failed to fetch account free balance")
+	}
+
+	bill, ok := billDetails[0].(map[string]interface{})
+	if !ok {
+		return 0, errors.New("failed to fetch account free balance")
+	}
+
+	desc := bill["desc"].(string)
+	compile := regexp.MustCompile(`\((\d+/100)\)`)
+	matched := compile.FindStringSubmatch(desc)
+	if len(matched) < 2 {
+		return 0, errors.New("failed to fetch account free balance")
+	}
+
+	split := strings.Split(matched[1], "/")
+	total, _ := strconv.Atoi(split[1])
+	used, _ := strconv.Atoi(split[0])
+	return total - used, nil
 }
 
 func (c *Chat) Images(ctx context.Context, prompt string) (string, error) {

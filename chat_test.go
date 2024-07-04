@@ -2,6 +2,7 @@ package coze
 
 import (
 	"context"
+	"github.com/bincooo/emit.io"
 	"github.com/sirupsen/logrus"
 	"strings"
 	"sync"
@@ -18,6 +19,22 @@ func TestCookie(t *testing.T) {
 	options := NewDefaultOptions("7353047124357365778", "1712645567468", 2, false, "http://127.0.0.1:7890")
 	chat := New(cookie, msToken, options)
 	t.Log(chat.makeCookie())
+}
+
+func TestQueryWebSdk(t *testing.T) {
+	session, err := emit.NewDefaultSession("http://127.0.0.1:7890", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	options := NewDefaultOptions("7353047124357365778", "1712645567468", 2, false, "http://127.0.0.1:7890")
+	chat := New(cookie, msToken, options)
+	chat.Session(session)
+	count, err := chat.QueryWebSdkCredits(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(count)
 }
 
 func TestChats(t *testing.T) {

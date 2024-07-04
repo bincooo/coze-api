@@ -1,3 +1,5 @@
+❗❗❗ coze已改为收费模式，无法继续免费使用了，若是付费使用建议直接用coze官网提供的api
+
 #### 推荐一下coze-api库实现的gpt转接口
 
 [https://github.com/bincooo/chatgpt-adapter](https://github.com/bincooo/chatgpt-adapter/tree/v2)

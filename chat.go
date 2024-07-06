@@ -162,6 +162,176 @@ func (c *Chat) replyWebSdk(ctx context.Context, t MessageType, histories []inter
 	return ch, nil
 }
 
+// 获取bots
+func (c *Chat) QueryBots(ctx context.Context) ([]interface{}, error) {
+	if c.msToken == "" {
+		msToken, err := c.reportMsToken()
+		if err != nil {
+			return nil, err
+		}
+		c.msToken = msToken
+	}
+	space, err := c.GetSpace(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := emit.ClientBuilder(c.session).
+		Context(ctx).
+		Proxies(c.opts.proxies).
+		POST("https://www.coze.com/api/draftbot/get_draft_bot_list").
+		Query("msToken", c.msToken).
+		Header("user-agent", userAgent).
+		Header("cookie", c.makeCookie()).
+		Header("origin", "https://www.coze.com").
+		Header("referer", "https://www.coze.com/space/"+space+"/bot").
+		JHeader().
+		Body(map[string]interface{}{
+			"space_id":              space,
+			"order_by":              1,
+			"team_bot_type":         0,
+			"page_index":            1,
+			"page_size":             50,
+			"is_publish":            0,
+			"draft_bot_status_list": []int{1, 2, 3},
+		}).
+		DoC(emit.Status(http.StatusOK), emit.IsJSON)
+	if err != nil {
+		return nil, err
+	}
+
+	obj, err := emit.ToMap(response)
+	if err != nil {
+		return nil, err
+	}
+
+	if code, ok := obj["code"].(float64); !ok || code != 0 {
+		return nil, errors.New("query failed")
+	}
+
+	data, ok := obj["data"].(map[string]interface{})
+	if !ok {
+		return nil, errors.New("query failed")
+	}
+
+	slice, ok := data["bot_draft_list"].([]interface{})
+	if !ok {
+		return nil, errors.New("query failed")
+	}
+	return slice, nil
+}
+
+// 创建bot
+func (c *Chat) Create(ctx context.Context, name string) (botId string, err error) {
+	if c.msToken == "" {
+		msToken, err := c.reportMsToken()
+		if err != nil {
+			return "", err
+		}
+		c.msToken = msToken
+	}
+	space, err := c.GetSpace(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	payload := map[string]interface{}{
+		"space_id": space,
+		"name":     name,
+		"icon_uri": "FileBizType.BIZ_BOT_ICON/default_bot_icon6.png",
+		"monetization_conf": map[string]interface{}{
+			"is_enable": true,
+		},
+	}
+
+	response, err := emit.ClientBuilder(c.session).
+		Context(ctx).
+		Proxies(c.opts.proxies).
+		Option(c.connOpts).
+		POST("https://www.coze.com/api/draftbot/create").
+		Query("msToken", c.msToken).
+		Header("user-agent", userAgent).
+		Header("cookie", c.makeCookie()).
+		Header("origin", "https://www.coze.com").
+		Header("referer", "https://www.coze.com/space/"+space+"/bot").
+		JHeader().
+		Body(payload).
+		DoC(emit.Status(http.StatusOK), emit.IsJSON)
+	if err != nil {
+		return "", err
+	}
+
+	obj, err := emit.ToMap(response)
+	if err != nil {
+		return "", err
+	}
+
+	if code, ok := obj["code"].(float64); !ok || code != 0 {
+		return "", errors.New("create failed")
+	}
+
+	data, ok := obj["data"].(map[string]interface{})
+	if !ok {
+		return "", errors.New("create failed")
+	}
+
+	return data["bot_id"].(string), nil
+}
+
+// 发布bot
+func (c *Chat) Publish(ctx context.Context, botId string) error {
+	if c.msToken == "" {
+		msToken, err := c.reportMsToken()
+		if err != nil {
+			return err
+		}
+		c.msToken = msToken
+	}
+	space, err := c.GetSpace(ctx)
+	if err != nil {
+		return err
+	}
+
+	response, err := emit.ClientBuilder(c.session).
+		Context(ctx).
+		Proxies(c.opts.proxies).
+		POST("https://www.coze.com/api/draftbot/publish").
+		Query("msToken", c.msToken).
+		Header("user-agent", userAgent).
+		Header("cookie", c.makeCookie()).
+		Header("referer", "https://www.coze.com/token").
+		JHeader().
+		Body(map[string]interface{}{
+			"space_id":   space,
+			"bot_id":     botId,
+			"work_info":  map[string]string{"history_info": ""},
+			"connectors": map[string]interface{}{"999": map[string]string{"sdk_version": "0.1.0-beta.4"}},
+			"botMode":    0,
+			"submit_bot_market_config": map[string]interface{}{
+				"need_submit": false,
+				"open_source": false,
+				"category_id": "",
+			},
+			"publish_id":     randHex(21),
+			"commit_version": "", "publish_type": 0},
+		).
+		DoC(emit.Status(http.StatusOK), emit.IsJSON)
+	if err != nil {
+		return err
+	}
+
+	obj, err := emit.ToMap(response)
+	if err != nil {
+		return err
+	}
+
+	if code, ok := obj["code"].(float64); !ok || code != 0 {
+		return errors.New("publish failed")
+	}
+
+	return nil
+}
+
 // 查询可用额度
 func (c *Chat) QueryWebSdkCredits(ctx context.Context) (int, error) {
 	curr := time.Now()
@@ -216,7 +386,7 @@ func (c *Chat) QueryWebSdkCredits(ctx context.Context) (int, error) {
 
 	billDetails := data.([]interface{})
 	if len(billDetails) == 0 {
-		return 0, errors.New("failed to fetch account free balance")
+		return 100, nil
 	}
 
 	bill, ok := billDetails[0].(map[string]interface{})
@@ -764,6 +934,8 @@ func (c *Chat) makeCookie() (cookie string) {
 	if !hmt {
 		cookie += fmt.Sprintf("msToken=%s; ", c.msToken)
 	}
+
+	cookie += "i18next=en; "
 	return
 }
 
@@ -920,6 +1092,8 @@ func (c *Chat) uploadSign(ctx context.Context, auth struct {
 	return
 }
 
+// signature: _signature
+// bogus: X-Bogus
 func (c *Chat) sign(payload interface{}) (string, string, error) {
 	response, err := emit.ClientBuilder(c.session).
 		//Proxies(proxies).
@@ -995,45 +1169,50 @@ func (c *Chat) reportMsToken() (string, error) {
 	return cookie, nil
 }
 
-//func (c *Chat) GetSpace() (err error) {
-//	response, err := emit.ClientBuilder().
-//		Proxies(c.opts.proxies).
-//		POST("https://www.coze.com/api/space/list").
-//		Query("msToken", c.msToken).
-//		Header("user-agent", userAgent).
-//		Header("cookie", c.makeCookie()).
-//		Header("origin", "https://www.coze.com").
-//		Header("referer", "https://www.coze.com/space/").
-//		JHeader().
-//		Body(map[string]interface{}{}).
-//		DoC(emit.Status(http.StatusOK), emit.IsJSON)
-//	if err != nil {
-//		return
-//	}
-//
-//	obj, err := emit.ToMap(response)
-//	if err != nil {
-//		return err
-//	}
-//
-//	if code, ok := obj["code"].(float64); !ok || code != 0 {
-//		return errors.New("space no found")
-//	}
-//
-//	list := obj["bot_space_list"].([]interface{})
-//	if len(list) == 0 {
-//		return errors.New("space no found")
-//	}
-//
-//	for _, value := range list {
-//		if str, ok := value.(map[string]interface{})["id"].(string); ok {
-//			c.opts.spaceId = str
-//			return
-//		}
-//	}
-//
-//	return errors.New("space no found")
-//}
+func (c *Chat) GetSpace(ctx context.Context) (space string, err error) {
+	if c.space != "" {
+		return c.space, nil
+	}
+
+	response, err := emit.ClientBuilder(c.session).
+		Proxies(c.opts.proxies).
+		Context(ctx).
+		POST("https://www.coze.com/api/space/list").
+		Query("msToken", c.msToken).
+		Header("user-agent", userAgent).
+		Header("cookie", c.makeCookie()).
+		Header("origin", "https://www.coze.com").
+		Header("referer", "https://www.coze.com/space/").
+		JHeader().
+		Body(map[string]interface{}{}).
+		DoC(emit.Status(http.StatusOK), emit.IsJSON)
+	if err != nil {
+		return
+	}
+
+	obj, err := emit.ToMap(response)
+	if err != nil {
+		return "", err
+	}
+
+	if code, ok := obj["code"].(float64); !ok || code != 0 {
+		return "", errors.New("space no found")
+	}
+
+	list := obj["bot_space_list"].([]interface{})
+	if len(list) == 0 {
+		return "", errors.New("space no found")
+	}
+
+	for _, value := range list {
+		if str, ok := value.(map[string]interface{})["id"].(string); ok {
+			c.space = str
+			return str, nil
+		}
+	}
+
+	return "", errors.New("space no found")
+}
 
 func (c *Chat) getCon() (conversationId string, err error) {
 	obj := map[string]interface{}{

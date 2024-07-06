@@ -37,6 +37,41 @@ func TestQueryWebSdk(t *testing.T) {
 	t.Log(count)
 }
 
+func TestBots(t *testing.T) {
+	session, err := emit.NewDefaultSession("http://127.0.0.1:7890", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	options := NewDefaultOptions("7353047124357365778", "1712645567468", 2, false, "http://127.0.0.1:7890")
+	chat := New(cookie, msToken, options)
+	chat.Session(session)
+	slice, err := chat.QueryBots(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	botId := ""
+	for _, value := range slice {
+		info := value.(map[string]interface{})
+		if info["name"] == "custom-128k" {
+			botId = info["id"].(string)
+			break
+		}
+	}
+
+	if botId != "" {
+		t.Logf("bot已存在: %s", botId)
+	}
+
+	err = chat.Publish(context.Background(), botId)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log("发布成功")
+}
+
 func TestChats(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(20)

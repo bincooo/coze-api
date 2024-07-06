@@ -13,6 +13,7 @@ type Chat struct {
 	session  *emit.Session
 	connOpts *emit.ConnectOption
 	space    string
+	ja3      string
 }
 
 type Options struct {

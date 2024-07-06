@@ -79,6 +79,10 @@ func New(cookie, msToken string, opts Options) Chat {
 	}
 }
 
+func (c *Chat) Ja3(ja3 string) {
+	c.ja3 = ja3
+}
+
 func (c *Chat) Reply(ctx context.Context, t MessageType, query string) (chan string, error) {
 	if c.webSdk {
 		return c.replyWebSdk(ctx, t, c.messages, query)
@@ -154,6 +158,7 @@ func (c *Chat) replyWebSdk(ctx context.Context, t MessageType, histories []inter
 	response, err := emit.ClientBuilder(c.session).
 		Context(ctx).
 		Proxies(c.opts.proxies).
+		Ja3(c.ja3).
 		POST("https://api.coze.com/open_api/v1/web_chat").
 		Query("msToken", c.msToken).
 		//Query("X-Bogus", bogus).

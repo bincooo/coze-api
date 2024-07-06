@@ -159,7 +159,7 @@ func (c *Chat) replyWebSdk(ctx context.Context, t MessageType, histories []inter
 		//Query("X-Bogus", bogus).
 		//Query("_signature", signature).
 		Header("user-agent", userAgent).
-		Header("cookie", c.makeCookie()).
+		Header("cookie", "msToken="+c.msToken).
 		Header("origin", "https://api.coze.com").
 		Header("referer", "https://api.coze.com/open-platform/sdk/chatapp/?params="+
 			url.QueryEscape(`{"chatClientId":"`+randHex(21)+`","chatConfig":{"bot_id":"`+
@@ -1016,7 +1016,6 @@ func (c *Chat) makeWebSdkPayload(ctx context.Context, t MessageType, histories [
 	}
 
 	data := map[string]interface{}{
-		//"content_type":     "text",
 		"query":            query,
 		"local_message_id": randHex(21),
 		"extra":            make(map[string]string),
@@ -1166,12 +1165,12 @@ func (c *Chat) reportMsToken() (string, error) {
 		return "", errors.New("refresh msToken failed")
 	}
 
-	url := res.Data["url"]
+	_url := res.Data["url"]
 	delete(res.Data, "url")
 	response, err = emit.ClientBuilder(c.session).
 		Proxies(c.opts.proxies).
 		Option(c.connOpts).
-		POST(fmt.Sprintf("%s/web/report", url)).
+		POST(fmt.Sprintf("%s/web/report", _url)).
 		Query("msToken", c.msToken).
 		JHeader().
 		Body(res.Data).
@@ -1481,16 +1480,18 @@ func (c *Chat) TransferMessages(messages []Message) (result []interface{}) {
 				"local_message_id": randHex(21),
 				// more ...
 			},
-			"index":     index,
-			"is_finish": true,
-			//"logId":        "20240607005905BF4F17BE43B37D011A9A",
+			"index":        index,
+			"is_finish":    true,
+			"logId":        "20240607005905BF4F17BE43B37D011A9A",
 			"mention_list": make([]string, 0),
 			"message_id":   mid,
 			"preset_bot":   "",
 			"reply_id":     mid,
 			"role":         condition(message.Role),
 			"section_id":   "999",
+			"broken_pos":   9999999,
 			"type":         messageT,
+			"_fromHistory": true,
 		})
 	}
 	return

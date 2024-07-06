@@ -31,6 +31,20 @@ var (
 	BaseURL = "https://www.coze.com/api/conversation"
 	SignURL = "https://complete-mmx-coze-helper.hf.space"
 	//SignURL = "http://127.0.0.1:3000"
+
+	ModelGpt4_8k   = "gpt-4-8k"
+	ModelGpt4_32k  = "gpt-4-32k"
+	ModelGpt4_128k = "gpt-4-128k"
+	ModelGpt4_125k = "gpt-4-125k"
+	ModelGpt35_16k = "gpt-35-16k"
+
+	modelMap = map[string]string{
+		"gpt-4-8k":   "124",
+		"gpt-4-32k":  "1719845284",
+		"gpt-4-128k": "1716293913",
+		"gpt-4-125k": "133",
+		"gpt-35-16k": "113",
+	}
 )
 
 type MessageType struct {
@@ -571,6 +585,10 @@ func (c *Chat) DraftBot(ctx context.Context, info DraftInfo, system string) erro
 	}
 	if info.MaxTokens == 0 {
 		info.MaxTokens = 4096
+	}
+
+	if info.Model != "" && modelMap[info.Model] != "" {
+		info.Model = modelMap[info.Model]
 	}
 
 	value, err := structToMap(info)

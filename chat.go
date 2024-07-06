@@ -12,6 +12,7 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -160,7 +161,10 @@ func (c *Chat) replyWebSdk(ctx context.Context, t MessageType, histories []inter
 		Header("user-agent", userAgent).
 		Header("cookie", c.makeCookie()).
 		Header("origin", "https://api.coze.com").
-		Header("referer", "https://api.coze.com/open-platform/sdk/chatapp").
+		Header("referer", "https://api.coze.com/open-platform/sdk/chatapp/?params="+
+			url.QueryEscape(`{"chatClientId":"`+randHex(21)+`","chatConfig":{"bot_id":"`+
+				c.opts.botId+`","user":"`+
+				c.user+`","conversation_id":"`+randHex(21)+`"},"componentProps":{"layout":"pc","lang":"en","uploadable":true,"title":"Coze"}}`)).
 		JHeader().
 		Body(payload).
 		DoC(emit.Status(http.StatusOK), emit.IsSTREAM)

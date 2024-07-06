@@ -239,7 +239,7 @@ func (c *Chat) QueryBots(ctx context.Context) ([]interface{}, error) {
 
 	slice, ok := data["bot_draft_list"].([]interface{})
 	if !ok {
-		return nil, errors.New("query failed")
+		return make([]interface{}, 0), nil
 	}
 	return slice, nil
 }

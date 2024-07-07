@@ -103,7 +103,7 @@ func (c *Chat) Reply(ctx context.Context, t MessageType, query string) (chan str
 
 	payload := c.makePayload(conversationId, t, query)
 	// 签名
-	bogus, signature, err := c.sign(payload)
+	bogus, signature, err := c.sign("", payload)
 	if err != nil {
 		return nil, err
 	}
@@ -150,10 +150,10 @@ func (c *Chat) replyWebSdk(ctx context.Context, t MessageType, histories []inter
 		return nil, err
 	}
 	// 签名
-	//bogus, signature, err := sign(c.opts.proxies, c.msToken, payload)
-	//if err != nil {
-	//	return nil, err
-	//}
+	bogus, signature, err := c.sign("api.coze.com/open_api/v1/web_chat", payload)
+	if err != nil {
+		return nil, err
+	}
 
 	response, err := emit.ClientBuilder(c.session).
 		Context(ctx).
@@ -161,8 +161,8 @@ func (c *Chat) replyWebSdk(ctx context.Context, t MessageType, histories []inter
 		Ja3(c.ja3).
 		POST("https://api.coze.com/open_api/v1/web_chat").
 		Query("msToken", c.msToken).
-		//Query("X-Bogus", bogus).
-		//Query("_signature", signature).
+		Query("X-Bogus", bogus).
+		Query("_signature", signature).
 		Header("user-agent", userAgent).
 		Header("cookie", "msToken="+c.msToken).
 		Header("origin", "https://api.coze.com").
@@ -448,7 +448,7 @@ func (c *Chat) Images(ctx context.Context, prompt string) (string, error) {
 	payload := c.makePayload(conversationId, Text, query)
 
 	// 签名
-	bogus, signature, err := c.sign(payload)
+	bogus, signature, err := c.sign("", payload)
 	if err != nil {
 		return "", err
 	}
@@ -715,7 +715,7 @@ label:
 	payload := map[string]string{
 		"scene": "bot_task",
 	}
-	bogus, signature, err := c.sign(payload)
+	bogus, signature, err := c.sign("", payload)
 	if err != nil {
 		return "", err
 	}
@@ -1120,12 +1120,13 @@ func (c *Chat) uploadSign(ctx context.Context, auth struct {
 
 // signature: _signature
 // bogus: X-Bogus
-func (c *Chat) sign(payload interface{}) (string, string, error) {
+func (c *Chat) sign(uri string, payload interface{}) (string, string, error) {
 	response, err := emit.ClientBuilder(c.session).
 		//Proxies(proxies).
 		Option(c.connOpts).
 		POST(SignURL).
 		Query("msToken", c.msToken).
+		Query("uri", url.QueryEscape(uri)).
 		JHeader().
 		Body(payload).
 		DoS(http.StatusOK)
@@ -1170,12 +1171,16 @@ func (c *Chat) reportMsToken() (string, error) {
 		return "", errors.New("refresh msToken failed")
 	}
 
-	_url := res.Data["url"]
+	u := res.Data["url"]
+	if c.webSdk {
+		u = "https://mssdk-i18n-sg.ciciai.com"
+	}
+
 	delete(res.Data, "url")
 	response, err = emit.ClientBuilder(c.session).
 		Proxies(c.opts.proxies).
 		Option(c.connOpts).
-		POST(fmt.Sprintf("%s/web/report", _url)).
+		POST(fmt.Sprintf("%s/web/report", u)).
 		Query("msToken", c.msToken).
 		JHeader().
 		Body(res.Data).

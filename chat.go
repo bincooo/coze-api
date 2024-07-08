@@ -33,18 +33,18 @@ var (
 	SignURL = "https://complete-mmx-coze-helper.hf.space"
 	//SignURL = "http://127.0.0.1:3000"
 
-	ModelGpt4_8k   = "gpt-4-8k"
-	ModelGpt4_32k  = "gpt-4-32k"
-	ModelGpt4_128k = "gpt-4-128k"
-	ModelGpt4_125k = "gpt-4-125k"
-	ModelGpt35_16k = "gpt-35-16k"
+	ModelGpt4o_8k   = "gpt4o-8k"
+	ModelGpt4o_32k  = "gpt4o-32k"
+	ModelGpt4o_128k = "gpt4o-128k"
+	ModelGpt4_125k  = "gpt4-125k"
+	ModelGpt35_16k  = "gpt35-16k"
 
 	modelMap = map[string]string{
-		"gpt-4-8k":   "124",
-		"gpt-4-32k":  "1719845284",
-		"gpt-4-128k": "1716293913",
-		"gpt-4-125k": "133",
-		"gpt-35-16k": "113",
+		ModelGpt4o_8k:   "124",
+		ModelGpt4o_32k:  "1719845284",
+		ModelGpt4o_128k: "1716293913",
+		ModelGpt4_125k:  "133",
+		ModelGpt35_16k:  "113",
 	}
 )
 

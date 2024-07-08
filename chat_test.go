@@ -21,7 +21,7 @@ func TestCookie(t *testing.T) {
 	t.Log(chat.makeCookie())
 }
 
-func TestQueryWebSdk(t *testing.T) {
+func TestWebSdkCredits(t *testing.T) {
 	session, err := emit.NewDefaultSession("http://127.0.0.1:7890", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -30,11 +30,11 @@ func TestQueryWebSdk(t *testing.T) {
 	options := NewDefaultOptions("7353047124357365778", "1712645567468", 2, false, "http://127.0.0.1:7890")
 	chat := New(cookie, msToken, options)
 	chat.Session(session)
-	count, err := chat.QueryWebSdkCredits(context.Background())
+	credits, err := chat.QueryWebSdkCredits(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log(count)
+	t.Logf("可用额度：%d", credits)
 }
 
 func TestBots(t *testing.T) {
@@ -66,7 +66,7 @@ func TestBots(t *testing.T) {
 	t.Logf("bot已存在: %s", botId)
 
 	err = chat.DraftBot(context.Background(), DraftInfo{
-		Model:            ModelGpt4_128k,
+		Model:            ModelGpt4o_128k,
 		Temperature:      0.75,
 		TopP:             1,
 		FrequencyPenalty: 0,
@@ -139,7 +139,7 @@ func TestChat(t *testing.T) {
 	echo(ch, t)
 }
 
-func TestChat2(t *testing.T) {
+func TestWebSdk(t *testing.T) {
 	logrus.SetLevel(logrus.TraceLevel)
 	options := NewDefaultOptions("7377557797556764690", "", 1000, false, "http://127.0.0.1:7890")
 	chat := New(cookie, msToken, options)

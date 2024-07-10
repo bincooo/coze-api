@@ -1441,7 +1441,7 @@ func (c *Chat) resolve(ctx context.Context, conversationId string, response *htt
 			ch <- "error: context done"
 			return
 		default:
-			if stop := Do(); stop {
+			if stop := !Do(); stop {
 				return
 			}
 		}

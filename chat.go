@@ -70,6 +70,13 @@ func NewDefaultOptions(botId, version string, scene int, owner bool, proxies str
 	}
 }
 
+func (opts *Options) Bot(id, version string, scene int, o bool) {
+	opts.botId = id
+	opts.version = version
+	opts.scene = scene
+	opts.owner = o
+}
+
 func New(cookie, msToken string, opts Options) Chat {
 	return Chat{
 		cookie:  cookie,
@@ -80,6 +87,10 @@ func New(cookie, msToken string, opts Options) Chat {
 
 func (c *Chat) Ja3(ja3 string) {
 	c.ja3 = ja3
+}
+
+func (c *Chat) Bot(id, version string, scene int, o bool) {
+	c.opts.Bot(id, version, scene, o)
 }
 
 func (c *Chat) Reply(ctx context.Context, t MessageType, query string) (chan string, error) {

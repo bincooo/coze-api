@@ -46,6 +46,7 @@ func TestBots(t *testing.T) {
 	options := NewDefaultOptions("7388071918744240133", "7353038106104528914", 1000, false, "http://127.0.0.1:7890")
 	chat := New(cookie, msToken, options)
 	chat.Session(session)
+
 	slice, err := chat.QueryBots(context.Background())
 	if err != nil {
 		t.Fatal(err)

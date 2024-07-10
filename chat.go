@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"github.com/bincooo/emit.io"
 	"github.com/sirupsen/logrus"
-	"io"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -1347,68 +1346,93 @@ func (c *Chat) delCon(conversationId string) {
 }
 
 func (c *Chat) resolve(ctx context.Context, conversationId string, response *http.Response, ch chan string) {
-	var data []byte
-	before := []byte("data:")
-	errorBefore := []byte("{\"code\":")
+	prefix := []byte("data:")
+	errorPrefix := []byte("{\"code\":")
 	defer close(ch)
-	defer c.delCon(conversationId)
 	defer response.Body.Close()
+	if !c.webSdk {
+		defer c.delCon(conversationId)
+	}
 
-	r := bufio.NewReader(response.Body)
-	// 继续执行返回false
-	Do := func() bool {
-		line, prefix, err := r.ReadLine()
-		if err != nil {
-			if err != io.EOF {
-				ch <- fmt.Sprintf("error: %v", err)
-			}
-			return true
+	scanner := bufio.NewScanner(response.Body)
+	scanner.Split(func(data []byte, eof bool) (advance int, token []byte, err error) {
+		if eof && len(data) == 0 {
+			return 0, nil, nil
 		}
+		if i := bytes.IndexByte(data, '\n'); i >= 0 {
+			return i + 1, data[0:i], nil
+		}
+		if eof {
+			return len(data), data, nil
+		}
+		return 0, nil, nil
+	})
 
-		data = append(data, line...)
-		if prefix {
+	// true 继续，false 结束
+	Do := func() bool {
+		if !scanner.Scan() {
 			return false
 		}
 
-		logrus.Tracef("--------- ORIGINAL MESSAGE ---------")
-		logrus.Tracef("%s", data)
-
-		if bytes.HasPrefix(data, errorBefore) {
-			ch <- fmt.Sprintf("error: %s", data)
+		var event string
+		data := scanner.Text()
+		logrus.Trace("--------- ORIGINAL MESSAGE ---------")
+		logrus.Trace(data)
+		if data == "" {
 			return true
 		}
 
-		if bytes.HasPrefix(data, before) {
-			var msg resMessage
-			data = bytes.TrimPrefix(data, before)
-			if len(data) == 0 {
-				data = nil
-				return false
-			}
-
-			err = json.Unmarshal(data, &msg)
-			if err != nil {
-				ch <- fmt.Sprintf("error: %v", err)
-				return true
-			}
-
-			if msg.Message.Role == "assistant" {
-				if msg.Message.Type == "answer" {
-					if IsLimit(msg.Message.Content) {
-						ch <- fmt.Sprintf("error: %v", msg.Message.Content)
-						return true
-					}
-					ch <- fmt.Sprintf("text: %s", msg.Message.Content)
-				}
-				if msg.Message.Type == "tool_response" && strings.HasPrefix(msg.Message.Content, "Failed:") {
-					ch <- fmt.Sprintf("error: %v", msg.Message.Content)
-					return true
-				}
-			}
+		if len(data) < 6 || data[:6] != "event:" {
+			return true
+		}
+		event = strings.TrimSpace(data[6:])
+		if event == "done" {
+			return false
 		}
 
-		data = nil
-		return false
+		if !scanner.Scan() {
+			return false
+		}
+
+		dataBytes := scanner.Bytes()
+		logrus.Tracef("--------- ORIGINAL MESSAGE ---------")
+		logrus.Tracef("%s", dataBytes)
+
+		if bytes.HasPrefix(dataBytes, errorPrefix) {
+			ch <- fmt.Sprintf("error: %s", dataBytes)
+			return false
+		}
+
+		if !bytes.HasPrefix(dataBytes, prefix) {
+			return true
+		}
+
+		dataBytes = bytes.TrimPrefix(dataBytes, prefix)
+		if len(dataBytes) == 0 {
+			return true
+		}
+
+		var msg resMessage
+		err := json.Unmarshal(dataBytes, &msg)
+		if err != nil {
+			logrus.Errorf("unmarshal response failed: %v", err)
+			return true
+		}
+
+		if msg.Message.Role == "assistant" {
+			if msg.Message.Type == "answer" {
+				if IsLimit(msg.Message.Content) {
+					ch <- fmt.Sprintf("error: %v", msg.Message.Content)
+					return false
+				}
+				ch <- fmt.Sprintf("text: %s", msg.Message.Content)
+			}
+			if msg.Message.Type == "tool_response" && strings.HasPrefix(msg.Message.Content, "Failed:") {
+				ch <- fmt.Sprintf("error: %v", msg.Message.Content)
+				return false
+			}
+		}
+		return true
 	}
 
 	for {

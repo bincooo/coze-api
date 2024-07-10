@@ -657,7 +657,7 @@ func (c *Chat) DraftBot(ctx context.Context, info DraftInfo, system string) erro
 	}
 
 	if code, ok := value["code"].(float64); ok && code != 0 {
-		return errors.New("update info failed")
+		return fmt.Errorf("update info failed: %s", value["msg"])
 	}
 
 	values := []map[string]interface{}{

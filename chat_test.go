@@ -66,6 +66,12 @@ func TestBots(t *testing.T) {
 	}
 	t.Logf("bot已存在: %s", botId)
 
+	space, err := chat.GetSpace(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	chat.Bot(botId, space, 1000, false)
 	err = chat.DraftBot(context.Background(), DraftInfo{
 		Model:            ModelGpt4o_128k,
 		Temperature:      0.75,

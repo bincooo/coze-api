@@ -117,6 +117,8 @@ func (c *Chat) Reply(ctx context.Context, t MessageType, query string) (chan str
 	if err != nil {
 		return nil, err
 	}
+	//bogus := "DFSzs5VObd94XIqMtwxdRdsNhy0e"
+	//signature := "_02B4Z6wo00001w2fDhwAAIDA8mDx4JMieGMNnQqAAKYI3f"
 
 	response, err := emit.ClientBuilder(c.session).
 		Context(ctx).
@@ -1237,12 +1239,12 @@ func (c *Chat) GetSpace(ctx context.Context) (space string, err error) {
 	}
 
 	if code, ok := obj["code"].(float64); !ok || code != 0 {
-		return "", errors.New("space no found")
+		return "", errors.New(obj["msg"].(string))
 	}
 
 	list := obj["bot_space_list"].([]interface{})
 	if len(list) == 0 {
-		return "", errors.New("space no found")
+		return "", errors.New("space no found [bot_space_list = 0]")
 	}
 
 	for _, value := range list {

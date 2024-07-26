@@ -32,11 +32,13 @@ var (
 	SignURL = "https://complete-mmx-coze-helper.hf.space"
 	//SignURL = "http://127.0.0.1:3000"
 
-	ModelGpt4o_8k   = "gpt4o-8k"
-	ModelGpt4o_32k  = "gpt4o-32k"
-	ModelGpt4o_128k = "gpt4o-128k"
-	ModelGpt4_125k  = "gpt4-125k"
-	ModelGpt35_16k  = "gpt35-16k"
+	ModelGpt4o_8k            = "gpt4o-8k"
+	ModelGpt4o_32k           = "gpt4o-32k"
+	ModelGpt4o_128k          = "gpt4o-128k"
+	ModelGpt4_125k           = "gpt4-125k"
+	ModelGpt35_16k           = "gpt35-16k"
+	ModelClaude35Sonnet_200k = "claude-35-sonnet-200k"
+	ModelClaude3Haiku_200k   = "claude-35-haiku-200k"
 
 	modelMap = map[string]string{
 		ModelGpt4o_8k:   "124",
@@ -44,6 +46,9 @@ var (
 		ModelGpt4o_128k: "1716293913",
 		ModelGpt4_125k:  "133",
 		ModelGpt35_16k:  "113",
+
+		ModelClaude35Sonnet_200k: "1717261861",
+		ModelClaude3Haiku_200k:   "1720702293",
 	}
 )
 

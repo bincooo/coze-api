@@ -86,7 +86,11 @@ func TestBots(t *testing.T) {
 	}
 	t.Log("更新模型")
 
-	err = chat.Publish(context.Background(), botId)
+	err = chat.Publish(context.Background(), botId, map[string]interface{}{
+		"999": map[string]interface{}{
+			"sdk_version": "0.1.0-beta.5",
+		},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

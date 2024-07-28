@@ -126,8 +126,6 @@ func (c *Chat) Reply(ctx context.Context, t MessageType, query string) (chan str
 	if err != nil {
 		return nil, err
 	}
-	//bogus := "DFSzs5VObd94XIqMtwxdRdsNhy0e"
-	//signature := "_02B4Z6wo00001w2fDhwAAIDA8mDx4JMieGMNnQqAAKYI3f"
 
 	response, err := emit.ClientBuilder(c.session).
 		Context(ctx).
@@ -323,7 +321,7 @@ func (c *Chat) Create(ctx context.Context, name string) (botId string, err error
 }
 
 // 发布bot
-func (c *Chat) Publish(ctx context.Context, botId string) error {
+func (c *Chat) Publish(ctx context.Context, botId string, connectors map[string]interface{}) error {
 	if c.msToken == "" {
 		msToken, err := c.reportMsToken()
 		if err != nil {
@@ -346,19 +344,15 @@ func (c *Chat) Publish(ctx context.Context, botId string) error {
 		Header("referer", "https://www.coze.com/token").
 		JHeader().
 		Body(map[string]interface{}{
-			"space_id":   space,
-			"bot_id":     botId,
-			"work_info":  map[string]string{"history_info": ""},
-			"connectors": map[string]interface{}{"999": map[string]string{"sdk_version": "0.1.0-beta.4"}},
-			"botMode":    0,
-			"submit_bot_market_config": map[string]interface{}{
-				"need_submit": false,
-				"open_source": false,
-				"category_id": "",
-			},
+			"space_id":       space,
+			"bot_id":         botId,
+			"work_info":      map[string]string{"history_info": ""},
+			"connectors":     connectors,
+			"botMode":        0,
 			"publish_id":     randHex(21),
-			"commit_version": "", "publish_type": 0},
-		).
+			"commit_version": "",
+			"publish_type":   0,
+		}).
 		DoC(emit.Status(http.StatusOK), emit.IsJSON)
 	if err != nil {
 		return err

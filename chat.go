@@ -622,6 +622,13 @@ func (c *Chat) DraftBot(ctx context.Context, info DraftInfo, system string) erro
 		return err
 	}
 
+	if isClaude(info.Model) {
+		delete(value, "top_p")
+		delete(value, "frequency_penalty")
+		delete(value, "presence_penalty")
+		delete(value, "response_format")
+	}
+
 	value["model_style"] = 0
 	value["ShortMemPolicy"] = map[string]interface{}{
 		"HistoryRound": 3,
@@ -1599,4 +1606,11 @@ func structToMap(obj interface{}) (value map[string]interface{}, err error) {
 	}
 	err = json.Unmarshal(objBytes, &value)
 	return
+}
+
+func isClaude(model string) bool {
+	return model == ModelClaude35Sonnet_200k ||
+		model == ModelClaude3Haiku_200k ||
+		model == modelMap[ModelClaude35Sonnet_200k] ||
+		model == modelMap[ModelClaude3Haiku_200k]
 }

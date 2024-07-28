@@ -71,7 +71,7 @@ func ModelToId(model string) string {
 
 func NewDefaultOptions(botId, version string, scene int, owner bool, proxies string) Options {
 	return Options{
-		botId:   botId,
+		BotId:   botId,
 		version: version,
 		scene:   scene,
 		proxies: proxies,
@@ -80,7 +80,7 @@ func NewDefaultOptions(botId, version string, scene int, owner bool, proxies str
 }
 
 func (opts *Options) Bot(id, version string, scene int, o bool) {
-	opts.botId = id
+	opts.BotId = id
 	opts.version = version
 	opts.scene = scene
 	opts.owner = o
@@ -189,7 +189,7 @@ func (c *Chat) replyWebSdk(ctx context.Context, t MessageType, histories []inter
 		Header("origin", "https://api.coze.com").
 		Header("referer", "https://api.coze.com/open-platform/sdk/chatapp/?params="+
 			url.QueryEscape(`{"chatClientId":"`+randHex(21)+`","chatConfig":{"bot_id":"`+
-				c.opts.botId+`","user":"`+
+				c.opts.BotId+`","user":"`+
 				c.user+`","conversation_id":"`+randHex(21)+`"},"componentProps":{"layout":"pc","lang":"en","uploadable":true,"title":"Coze"}}`)).
 		JHeader().
 		Body(payload).
@@ -564,7 +564,7 @@ label:
 		Header("referer", "https://www.coze.com/").
 		JHeader().
 		Body(map[string]string{
-			"bot_id":   c.opts.botId,
+			"bot_id":   c.opts.BotId,
 			"space_id": c.opts.version,
 		}).
 		DoC(emit.Status(http.StatusOK), emit.IsJSON)
@@ -644,7 +644,7 @@ func (c *Chat) DraftBot(ctx context.Context, info DraftInfo, system string) erro
 	}
 
 	payload := map[string]interface{}{
-		"bot_id":   c.opts.botId,
+		"bot_id":   c.opts.BotId,
 		"space_id": c.opts.version,
 		"work_info": map[string]interface{}{
 			"other_info": string(valueBytes),
@@ -689,7 +689,7 @@ func (c *Chat) DraftBot(ctx context.Context, info DraftInfo, system string) erro
 	}
 
 	payload = map[string]interface{}{
-		"bot_id":   c.opts.botId,
+		"bot_id":   c.opts.BotId,
 		"space_id": c.opts.version,
 		"work_info": map[string]interface{}{
 			"system_info_all": string(valueBytes),
@@ -1002,7 +1002,7 @@ func (c *Chat) makePayload(conversationId string, t MessageType, query string) m
 		"extra":            make(map[string]string),
 		"scene":            c.opts.scene,
 		"bot_version":      c.opts.version,
-		"bot_id":           c.opts.botId,
+		"bot_id":           c.opts.BotId,
 		"conversation_id":  conversationId,
 		"draft_mode":       false,
 		"stream":           true,
@@ -1029,7 +1029,7 @@ func (c *Chat) makeWebSdkPayload(ctx context.Context, t MessageType, histories [
 			Proxies(c.opts.proxies).
 			GET("https://api.coze.com/open_api/v1/bot/onboarding").
 			Query("source", "web_sdk").
-			Query("bot_id", c.opts.botId).
+			Query("bot_id", c.opts.BotId).
 			Query("msToken", c.msToken).
 			DoC(emit.Status(http.StatusOK), emit.IsJSON)
 		if err != nil {
@@ -1053,7 +1053,7 @@ func (c *Chat) makeWebSdkPayload(ctx context.Context, t MessageType, histories [
 		"local_message_id": randHex(21),
 		"extra":            make(map[string]string),
 		"scene":            c.opts.scene,
-		"bot_id":           c.opts.botId,
+		"bot_id":           c.opts.BotId,
 		"conversation_id":  randHex(21),
 		"draft_mode":       false,
 		"stream":           true,
@@ -1278,7 +1278,7 @@ func (c *Chat) getCon() (conversationId string, err error) {
 		"cursor":                      "0",
 		"count":                       15,
 		"draft_mode":                  false,
-		"bot_id":                      c.opts.botId,
+		"bot_id":                      c.opts.BotId,
 		"scene":                       c.opts.scene,
 		"biz_kind":                    "",
 		"insert_history_message_list": make([]string, 0),
@@ -1360,7 +1360,7 @@ func (c *Chat) delCon(conversationId string) {
 		Header("referer", "https://www.coze.com/store/bot").
 		JHeader().
 		Body(map[string]any{
-			"bot_id":          c.opts.botId,
+			"bot_id":          c.opts.BotId,
 			"conversation_id": conversationId,
 			"scene":           c.opts.scene,
 		}).
@@ -1535,7 +1535,7 @@ func (c *Chat) TransferMessages(messages []Message) (result []interface{}) {
 		}
 
 		result = append(result, map[string]interface{}{
-			"bot_id":       c.opts.botId,
+			"bot_id":       c.opts.BotId,
 			"content":      message.Content,
 			"content_obj":  message.Content,
 			"content_type": "text",

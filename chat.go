@@ -65,6 +65,10 @@ var (
 	Mix  = MessageType{"mix"}
 )
 
+func ModelToId(model string) string {
+	return modelMap[model]
+}
+
 func NewDefaultOptions(botId, version string, scene int, owner bool, proxies string) Options {
 	return Options{
 		botId:   botId,

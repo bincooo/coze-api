@@ -334,6 +334,17 @@ func (c *Chat) Publish(ctx context.Context, botId string, connectors map[string]
 		return err
 	}
 
+	payload := map[string]interface{}{
+		"space_id":       space,
+		"bot_id":         botId,
+		"work_info":      map[string]string{"history_info": ""},
+		"connectors":     connectors,
+		"botMode":        0,
+		"publish_id":     randHex(21),
+		"commit_version": "",
+		"publish_type":   0,
+	}
+
 	response, err := emit.ClientBuilder(c.session).
 		Context(ctx).
 		Proxies(c.opts.proxies).
@@ -343,28 +354,20 @@ func (c *Chat) Publish(ctx context.Context, botId string, connectors map[string]
 		Header("cookie", c.makeCookie()).
 		Header("referer", "https://www.coze.com/token").
 		JHeader().
-		Body(map[string]interface{}{
-			"space_id":       space,
-			"bot_id":         botId,
-			"work_info":      map[string]string{"history_info": ""},
-			"connectors":     connectors,
-			"botMode":        0,
-			"publish_id":     randHex(21),
-			"commit_version": "",
-			"publish_type":   0,
-		}).
+		Body(payload).
 		DoC(emit.Status(http.StatusOK), emit.IsJSON)
 	if err != nil {
 		return err
 	}
 
+	defer response.Body.Close()
 	obj, err := emit.ToMap(response)
 	if err != nil {
 		return err
 	}
 
 	if code, ok := obj["code"].(float64); !ok || code != 0 {
-		return errors.New("publish failed")
+		return errors.New("publish failed: " + obj["msg"].(string))
 	}
 
 	return nil
@@ -1140,8 +1143,8 @@ func (c *Chat) uploadSign(ctx context.Context, auth struct {
 	return
 }
 
-// signature: _signature
 // bogus: X-Bogus
+// signature: _signature
 func (c *Chat) sign(uri string, payload interface{}) (string, string, error) {
 	response, err := emit.ClientBuilder(c.session).
 		//Proxies(proxies).
@@ -1242,6 +1245,7 @@ func (c *Chat) GetSpace(ctx context.Context) (space string, err error) {
 	if err != nil {
 		return
 	}
+	defer response.Body.Close()
 
 	obj, err := emit.ToMap(response)
 	if err != nil {
@@ -1293,6 +1297,7 @@ func (c *Chat) getCon() (conversationId string, err error) {
 	if err != nil {
 		return
 	}
+	defer response.Body.Close()
 
 	obj, err = emit.ToMap(response)
 	_ = response.Body.Close()

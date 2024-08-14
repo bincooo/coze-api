@@ -112,11 +112,11 @@ func TestChats(t *testing.T) {
 }
 
 func TestChat(t *testing.T) {
-	options := NewDefaultOptions("7377557797556764690", "1716940640540", 2, false, "http://127.0.0.1:7890")
+	options := NewDefaultOptions("7395826240122322950", "573042141", 2, false, "http://127.0.0.1:7890")
 	chat := New(cookie, msToken, options)
 	timeout, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
-	ch, err := chat.Reply(timeout, Text, "摸摸～")
+	ch, err := chat.Reply(timeout, Text, "钢丝球炒鸡蛋这道菜怎么做？")
 	if err != nil {
 		t.Fatal(err)
 	}

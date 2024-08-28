@@ -335,14 +335,14 @@ func (c *Chat) Publish(ctx context.Context, botId string, connectors map[string]
 	}
 
 	payload := map[string]interface{}{
-		"space_id":       space,
-		"bot_id":         botId,
-		"work_info":      map[string]string{"history_info": ""},
-		"connectors":     connectors,
 		"botMode":        0,
-		"publish_id":     randHex(21),
+		"bot_id":         botId,
 		"commit_version": "",
+		"connectors":     connectors,
+		"history_info":   "",
+		"publish_id":     randHex(21),
 		"publish_type":   0,
+		"space_id":       space,
 	}
 
 	response, err := emit.ClientBuilder(c.session).

@@ -1382,7 +1382,9 @@ func (c *Chat) resolve(ctx context.Context, conversationId string, response *htt
 		defer c.delCon(conversationId)
 	}
 
+	m10 := 10 * 1024 * 1024 // bufio.Scanner: token too long ?
 	scanner := bufio.NewScanner(response.Body)
+	scanner.Buffer(make([]byte, 1024), m10)
 	scanner.Split(func(data []byte, eof bool) (advance int, token []byte, err error) {
 		if eof && len(data) == 0 {
 			return 0, nil, nil
@@ -1419,6 +1421,9 @@ func (c *Chat) resolve(ctx context.Context, conversationId string, response *htt
 		}
 
 		if !scanner.Scan() {
+			if err := scanner.Err(); err != nil {
+				ch <- fmt.Sprintf("error: %v", err)
+			}
 			return false
 		}
 

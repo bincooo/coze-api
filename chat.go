@@ -1401,6 +1401,9 @@ func (c *Chat) resolve(ctx context.Context, conversationId string, response *htt
 	// true 继续，false 结束
 	Do := func() bool {
 		if !scanner.Scan() {
+			if err := scanner.Err(); err != nil {
+				logrus.Error(err)
+			}
 			return false
 		}
 
@@ -1422,7 +1425,7 @@ func (c *Chat) resolve(ctx context.Context, conversationId string, response *htt
 
 		if !scanner.Scan() {
 			if err := scanner.Err(); err != nil {
-				ch <- fmt.Sprintf("error: %v", err)
+				logrus.Error(err)
 			}
 			return false
 		}

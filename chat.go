@@ -425,20 +425,30 @@ func (c *Chat) QueryWebSdkCredits(ctx context.Context) (int, error) {
 		return 0, errors.New("[bill_details-1] failed to fetch account free balance")
 	}
 
+	pos := 0
+retry:
 	billDetails := data.([]interface{})
-	if len(billDetails) == 0 {
-		return 100, nil
+	if len(billDetails) == pos {
+		if pos == 0 {
+			return 100, nil
+		}
+		return 0, errors.New("[bill_details-2] failed to fetch account free balance")
 	}
 
-	bill, ok := billDetails[0].(map[string]interface{})
+	bill, ok := billDetails[pos].(map[string]interface{})
 	if !ok {
-		return 0, errors.New("[bill_details-2] failed to fetch account free balance")
+		return 0, errors.New("[bill_details-3] failed to fetch account free balance")
 	}
 
 	desc := bill["desc"].(string)
 	compile := regexp.MustCompile(`\((\d+/100)\)`)
 	matched := compile.FindStringSubmatch(desc)
+	logrus.Info("balance desc:", desc)
 	if len(matched) < 2 {
+		if pos < 2 {
+			pos++
+			goto retry
+		}
 		return 0, errors.New("[desc match] failed to fetch account free balance")
 	}
 

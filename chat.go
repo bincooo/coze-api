@@ -417,12 +417,12 @@ func (c *Chat) QueryWebSdkCredits(ctx context.Context) (int, error) {
 
 	inter, ok := obj["data"].(interface{})
 	if !ok {
-		return 0, errors.New("failed to fetch account free balance")
+		return 0, errors.New("[data] failed to fetch account free balance")
 	}
 
 	data, ok := inter.(map[string]interface{})["bill_details"]
 	if !ok {
-		return 0, errors.New("failed to fetch account free balance")
+		return 0, errors.New("[bill_details-1] failed to fetch account free balance")
 	}
 
 	billDetails := data.([]interface{})
@@ -432,14 +432,14 @@ func (c *Chat) QueryWebSdkCredits(ctx context.Context) (int, error) {
 
 	bill, ok := billDetails[0].(map[string]interface{})
 	if !ok {
-		return 0, errors.New("failed to fetch account free balance")
+		return 0, errors.New("[bill_details-2] failed to fetch account free balance")
 	}
 
 	desc := bill["desc"].(string)
 	compile := regexp.MustCompile(`\((\d+/100)\)`)
 	matched := compile.FindStringSubmatch(desc)
 	if len(matched) < 2 {
-		return 0, errors.New("failed to fetch account free balance")
+		return 0, errors.New("[desc match] failed to fetch account free balance")
 	}
 
 	split := strings.Split(matched[1], "/")

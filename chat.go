@@ -177,7 +177,7 @@ func (c *Chat) replyWebSdk(ctx context.Context, t MessageType, histories []inter
 	response, err := emit.ClientBuilder(c.session).
 		Context(ctx).
 		Proxies(c.opts.proxies).
-		Ja3(c.ja3).
+		Ja3().
 		POST("https://api.coze.com/open_api/v1/web_chat").
 		Query("msToken", c.msToken).
 		Query("X-Bogus", bogus).

@@ -29,7 +29,7 @@ const (
 
 var (
 	BaseURL = "https://www.coze.com/api/conversation"
-	SignURL = "https://chat-completion-helper.hf.space"
+	SignURL = "https://wik5ez2o-helper.hf.space"
 	//SignURL = "http://127.0.0.1:3000"
 
 	ModelGpt4o_8k            = "gpt4o-8k"

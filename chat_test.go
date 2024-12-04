@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	cookie  = "xxx"
+	cookie  = ""
 	msToken = ""
 )
 
@@ -22,7 +22,7 @@ func TestCookie(t *testing.T) {
 }
 
 func TestWebSdkCredits(t *testing.T) {
-	session, err := emit.NewDefaultSession("http://127.0.0.1:7890", nil)
+	session, err := emit.NewSession("http://127.0.0.1:7890", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +38,7 @@ func TestWebSdkCredits(t *testing.T) {
 }
 
 func TestBots(t *testing.T) {
-	session, err := emit.NewDefaultSession("http://127.0.0.1:7890", nil)
+	session, err := emit.NewSession("http://127.0.0.1:7890", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +55,7 @@ func TestBots(t *testing.T) {
 	botId := ""
 	for _, value := range slice {
 		info := value.(map[string]interface{})
-		if info["name"] == "custom-128k" {
+		if info["name"] == "custom-assistant" {
 			botId = info["id"].(string)
 			break
 		}

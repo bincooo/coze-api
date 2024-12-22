@@ -138,7 +138,7 @@ func (c *Chat) Reply(ctx context.Context, t MessageType, query string) (chan str
 		Header("cookie", c.makeCookie()).
 		Header("origin", "https://www.coze.com").
 		Header("referer", "https://www.coze.com/store/bot").
-		JHeader().
+		JSONHeader().
 		Body(payload).
 		DoC(emit.Status(http.StatusOK), emit.IsSTREAM)
 	if err != nil {
@@ -189,7 +189,7 @@ func (c *Chat) replyWebSdk(ctx context.Context, t MessageType, histories []inter
 			url.QueryEscape(`{"chatClientId":"`+randHex(21)+`","chatConfig":{"bot_id":"`+
 				c.opts.BotId+`","user":"`+
 				c.user+`","conversation_id":"`+randHex(21)+`"},"componentProps":{"layout":"pc","lang":"en","uploadable":true,"title":"Coze"}}`)).
-		JHeader().
+		JSONHeader().
 		Body(payload).
 		DoC(emit.Status(http.StatusOK), emit.IsSTREAM)
 	if err != nil {
@@ -227,7 +227,7 @@ func (c *Chat) QueryBots(ctx context.Context) ([]interface{}, error) {
 		Header("cookie", c.makeCookie()).
 		Header("origin", "https://www.coze.com").
 		Header("referer", "https://www.coze.com/space/"+space+"/bot").
-		JHeader().
+		JSONHeader().
 		Body(map[string]interface{}{
 			"space_id":              space,
 			"order_by":              1,
@@ -296,7 +296,7 @@ func (c *Chat) Create(ctx context.Context, name string) (botId string, err error
 		Header("cookie", c.makeCookie()).
 		Header("origin", "https://www.coze.com").
 		Header("referer", "https://www.coze.com/space/"+space+"/bot").
-		JHeader().
+		JSONHeader().
 		Body(payload).
 		DoC(emit.Status(http.StatusOK), emit.IsJSON)
 	if err != nil {
@@ -353,7 +353,7 @@ func (c *Chat) Publish(ctx context.Context, botId string, connectors map[string]
 		Header("user-agent", userAgent).
 		Header("cookie", c.makeCookie()).
 		Header("referer", "https://www.coze.com/token").
-		JHeader().
+		JSONHeader().
 		Body(payload).
 		DoC(emit.Status(http.StatusOK), emit.IsJSON)
 	if err != nil {
@@ -496,7 +496,7 @@ label:
 		Header("cookie", c.makeCookie()).
 		Header("origin", "https://www.coze.com").
 		Header("referer", "https://www.coze.com/").
-		JHeader().
+		JSONHeader().
 		Body(payload).
 		DoC(emit.Status(http.StatusOK), emit.IsSTREAM)
 	if err != nil {
@@ -569,7 +569,7 @@ label:
 		Header("cookie", c.makeCookie()).
 		Header("origin", "https://www.coze.com").
 		Header("referer", "https://www.coze.com/").
-		JHeader().
+		JSONHeader().
 		Body(map[string]string{
 			"bot_id":   c.opts.BotId,
 			"space_id": c.opts.version,
@@ -668,7 +668,7 @@ func (c *Chat) DraftBot(ctx context.Context, info DraftInfo, system string) erro
 		Header("cookie", c.makeCookie()).
 		Header("origin", "https://www.coze.com").
 		Header("referer", "https://www.coze.com/").
-		JHeader().
+		JSONHeader().
 		Body(payload).
 		DoC(emit.Status(http.StatusOK), emit.IsJSON)
 	if err != nil {
@@ -713,7 +713,7 @@ func (c *Chat) DraftBot(ctx context.Context, info DraftInfo, system string) erro
 		Header("cookie", c.makeCookie()).
 		Header("origin", "https://www.coze.com").
 		Header("referer", "https://www.coze.com/").
-		JHeader().
+		JSONHeader().
 		Body(payload).
 		DoC(emit.Status(http.StatusOK), emit.IsJSON)
 	if err != nil {
@@ -773,7 +773,7 @@ label:
 		Header("referer", "https://www.coze.com/").
 		Header("cookie", c.makeCookie()).
 		Header("user-agent", userAgent).
-		JHeader().
+		JSONHeader().
 		Body(payload).
 		DoS(http.StatusOK)
 	if err != nil {
@@ -938,7 +938,7 @@ label:
 		Header("x-amz-security-token", headers["x-amz-security-token"].(string)).
 		Header("Authorization", headers["Authorization"].(string)).
 		Header("user-agent", userAgent).
-		JHeader().
+		JSONHeader().
 		Body(map[string]interface{}{
 			"SessionKey": uploadAddress["SessionKey"],
 		}).
@@ -1129,7 +1129,7 @@ func (c *Chat) uploadSign(ctx context.Context, auth struct {
 		Query("accessKeyId", auth.accessKeyId).
 		Query("secretAccessKey", auth.secretAccessKey).
 		Query("sessionToken", auth.sessionToken).
-		JHeader().
+		JSONHeader().
 		Body(obj).
 		DoS(http.StatusOK)
 	if err != nil {
@@ -1162,7 +1162,7 @@ func (c *Chat) sign(uri string, payload interface{}) (string, string, error) {
 		POST(SignURL).
 		Query("msToken", c.msToken).
 		Query("uri", url.QueryEscape(uri)).
-		JHeader().
+		JSONHeader().
 		Body(payload).
 		DoS(http.StatusOK)
 	if err != nil {
@@ -1217,7 +1217,7 @@ func (c *Chat) reportMsToken() (string, error) {
 		Option(c.connOpts).
 		POST(fmt.Sprintf("%s/web/report", u)).
 		Query("msToken", c.msToken).
-		JHeader().
+		JSONHeader().
 		Body(res.Data).
 		DoS(http.StatusOK)
 	if err != nil {
@@ -1249,7 +1249,7 @@ func (c *Chat) GetSpace(ctx context.Context) (space string, err error) {
 		Header("cookie", c.makeCookie()).
 		Header("origin", "https://www.coze.com").
 		Header("referer", "https://www.coze.com/space/").
-		JHeader().
+		JSONHeader().
 		Body(map[string]interface{}{}).
 		DoC(emit.Status(http.StatusOK), emit.IsJSON)
 	if err != nil {
@@ -1301,7 +1301,7 @@ func (c *Chat) getCon() (conversationId string, err error) {
 		Header("cookie", c.makeCookie()).
 		Header("origin", "https://www.coze.com").
 		Header("referer", "https://www.coze.com/store/bot").
-		JHeader().
+		JSONHeader().
 		Body(obj).
 		DoC(emit.Status(http.StatusOK), emit.IsJSON)
 	if err != nil {
@@ -1337,7 +1337,7 @@ func (c *Chat) createSection(conversationId string) {
 		Header("cookie", c.makeCookie()).
 		Header("origin", "https://www.coze.com").
 		Header("referer", "https://www.coze.com/store/bot").
-		JHeader().
+		JSONHeader().
 		Body(map[string]any{
 			"insert_history_message_list": make([]string, 0),
 			"conversation_id":             conversationId,
@@ -1367,7 +1367,7 @@ func (c *Chat) delCon(conversationId string) {
 		Header("cookie", c.makeCookie()).
 		Header("origin", "https://www.coze.com").
 		Header("referer", "https://www.coze.com/store/bot").
-		JHeader().
+		JSONHeader().
 		Body(map[string]any{
 			"bot_id":          c.opts.BotId,
 			"conversation_id": conversationId,

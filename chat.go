@@ -12,15 +12,10 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
-	"os"
-	"path/filepath"
-	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
-
-	"hash/crc32"
 )
 
 const (
@@ -108,11 +103,12 @@ func (c *Chat) Reply(ctx context.Context, t MessageType, query string) (chan str
 	}
 
 	if c.msToken == "" {
-		msToken, err := c.reportMsToken()
-		if err != nil {
-			return nil, err
-		}
-		c.msToken = msToken
+		//msToken, err := c.reportMsToken()
+		//if err != nil {
+		//	return nil, err
+		//}
+		//c.msToken = msToken
+		c.msToken = genMsToken()
 	}
 
 	conversationId, err := c.getCon()
@@ -142,9 +138,6 @@ func (c *Chat) Reply(ctx context.Context, t MessageType, query string) (chan str
 		Body(payload).
 		DoC(emit.Status(http.StatusOK), emit.IsSTREAM)
 	if err != nil {
-		if emit.IsJSON(response) == nil {
-			err = errors.New(emit.TextResponse(response))
-		}
 		return nil, err
 	}
 
@@ -733,243 +726,243 @@ func (c *Chat) DraftBot(ctx context.Context, info DraftInfo, system string) erro
 	return nil
 }
 
-// 文件上传
-func (c *Chat) Upload(ctx context.Context, file string) (string, error) {
-	// 啰里八嗦的代码，狗看了都摇头
-	retry := 3
-label:
-	retry--
-	{
-		msToken, err := c.reportMsToken()
-		if err != nil {
-			return "", err
-		}
-		c.msToken = msToken
-	}
-
-	payload := map[string]string{
-		"scene": "bot_task",
-	}
-	bogus, signature, err := c.sign("", payload)
-	if err != nil {
-		return "", err
-	}
-
-	fileBytes, err := os.ReadFile(file)
-	if err != nil {
-		return "", err
-	}
-
-	// 1. 下载凭证
-	response, err := emit.ClientBuilder(c.session).
-		Proxies(c.opts.proxies).
-		Context(ctx).
-		Option(c.connOpts).
-		POST("https://www.coze.com/api/playground/upload/auth_token").
-		Query("msToken", c.msToken).
-		Query("X-Bogus", bogus).
-		Query("_signature", signature).
-		Header("origin", "https://www.coze.com").
-		Header("referer", "https://www.coze.com/").
-		Header("cookie", c.makeCookie()).
-		Header("user-agent", userAgent).
-		JSONHeader().
-		Body(payload).
-		DoS(http.StatusOK)
-	if err != nil {
-		return "", err
-	}
-
-	obj, err := emit.ToMap(response)
-	_ = response.Body.Close()
-	if err != nil {
-		return "", err
-	}
-	if code, ok := obj["code"]; !ok || code.(float64) != 0 {
-		return "", fmt.Errorf("upload failed: %s", obj["msg"])
-	}
-	obj = obj["data"].(map[string]interface{})
-	serviceId := obj["service_id"].(string)
-	host := obj["upload_host"].(string)
-	auth := obj["auth"].(map[string]interface{})
-	fileExt := ".txt"
-	if ext := filepath.Ext(file); ext != "" {
-		fileExt = ext
-	}
-
-	// 2.1 签名
-	url, headers, err := c.uploadSign(ctx, struct {
-		method          string
-		sessionToken    string
-		accessKeyId     string
-		secretAccessKey string
-		host            string
-		serviceId       string
-		headers         map[string]interface{}
-		params          map[string]interface{}
-		body            map[string]interface{}
-	}{
-		method:          "GET",
-		sessionToken:    auth["session_token"].(string),
-		accessKeyId:     auth["access_key_id"].(string),
-		secretAccessKey: auth["secret_access_key"].(string),
-		host:            host,
-		serviceId:       serviceId,
-		params: map[string]interface{}{
-			"Action":        "ApplyImageUpload",
-			"ServiceId":     serviceId,
-			"FileSize":      len(fileBytes),
-			"FileExtension": fileExt,
-		},
-	})
-	if err != nil {
-		return "", err
-	}
-
-	// 2.2 ApplyImageUpload
-	response, err = emit.ClientBuilder(c.session).
-		Proxies(c.opts.proxies).
-		Context(ctx).
-		Option(c.connOpts).
-		GET(url).
-		Header("origin", "https://www.coze.com").
-		Header("referer", "https://www.coze.com/").
-		Header("X-Amz-Date", headers["X-Amz-Date"].(string)).
-		Header("x-amz-security-token", headers["x-amz-security-token"].(string)).
-		Header("Authorization", headers["Authorization"].(string)).
-		Header("user-agent", userAgent).
-		DoC(emit.Status(http.StatusOK), emit.IsJSON)
-	if err != nil {
-		return "", err
-	}
-
-	obj, err = emit.ToMap(response)
-	_ = response.Body.Close()
-	if err != nil {
-		return "", err
-	}
-
-	if _, ok := obj["Result"]; !ok {
-		if retry > 0 {
-			goto label
-		}
-		errMessage := obj["ResponseMetadata"].(map[string]interface{})["Error"]
-		return "", fmt.Errorf("upload failed: %v", errMessage)
-	}
-
-	obj = obj["Result"].(map[string]interface{})
-	uploadAddress := obj["InnerUploadAddress"].(map[string]interface{})
-	uploadAddress = uploadAddress["UploadNodes"].([]interface{})[0].(map[string]interface{})
-	storeInfo := uploadAddress["StoreInfos"].([]interface{})[0].(map[string]interface{})
-
-	// 3 上传文件
-	ieee := fmt.Sprintf("%x", crc32.ChecksumIEEE(fileBytes))
-	url = fmt.Sprintf("https://%s/upload/v1/%s", uploadAddress["UploadHost"], storeInfo["StoreUri"])
-	response, err = emit.ClientBuilder(c.session).
-		Proxies(c.opts.proxies).
-		Context(ctx).
-		Option(c.connOpts).
-		POST(url).
-		Header("origin", "https://www.coze.com").
-		Header("referer", "https://www.coze.com/").
-		Header("Authorization", storeInfo["Auth"].(string)).
-		Header("Content-Crc32", ieee).
-		Header("Content-Type", "application/octet-stream").
-		Header("Content-Disposition", "attachment; filename=\"undefined\"").
-		//Header("X-Storage-U", "7353045591632774160").
-		Header("user-agent", userAgent).
-		Bytes(fileBytes).
-		DoC(emit.Status(http.StatusOK), emit.IsJSON)
-	if err != nil {
-		return "", err
-	}
-
-	obj, err = emit.ToMap(response)
-	_ = response.Body.Close()
-	if err != nil {
-		return "", err
-	}
-
-	// throw error:  Mismatch CRC32 ???
-	if code, ok := obj["code"]; !ok || code.(float64) != 2000 {
-		return "", fmt.Errorf("upload failed: %s", obj["message"])
-	}
-
-	// 4.1 签名
-	url, headers, err = c.uploadSign(ctx, struct {
-		method          string
-		sessionToken    string
-		accessKeyId     string
-		secretAccessKey string
-		host            string
-		serviceId       string
-		headers         map[string]interface{}
-		params          map[string]interface{}
-		body            map[string]interface{}
-	}{
-		method:          "POST",
-		sessionToken:    auth["session_token"].(string),
-		accessKeyId:     auth["access_key_id"].(string),
-		secretAccessKey: auth["secret_access_key"].(string),
-		host:            host,
-		serviceId:       serviceId,
-		headers: map[string]interface{}{
-			"Content-Type": "application/json",
-		},
-		params: map[string]interface{}{
-			"Action":    "CommitImageUpload",
-			"ServiceId": serviceId,
-		},
-		body: map[string]interface{}{
-			"SessionKey": uploadAddress["SessionKey"],
-		},
-	})
-
-	// 4.2 CommitImageUpload
-	response, err = emit.ClientBuilder(c.session).
-		Proxies(c.opts.proxies).
-		Context(ctx).
-		Option(c.connOpts).
-		POST(url).
-		Header("origin", "https://www.coze.com").
-		Header("referer", "https://www.coze.com/").
-		Header("X-Amz-Date", headers["X-Amz-Date"].(string)).
-		Header("X-Amz-Content-Sha256", headers["X-Amz-Content-Sha256"].(string)).
-		Header("x-amz-security-token", headers["x-amz-security-token"].(string)).
-		Header("Authorization", headers["Authorization"].(string)).
-		Header("user-agent", userAgent).
-		JSONHeader().
-		Body(map[string]interface{}{
-			"SessionKey": uploadAddress["SessionKey"],
-		}).
-		DoC(emit.Status(http.StatusOK), emit.IsJSON)
-	if err != nil {
-		return "", err
-	}
-
-	obj, err = emit.ToMap(response)
-	_ = response.Body.Close()
-	if err != nil {
-		return "", err
-	}
-
-	if _, ok := obj["Result"]; !ok {
-		if retry > 0 {
-			goto label
-		}
-		errMessage := obj["ResponseMetadata"].(map[string]interface{})["Error"]
-		return "", fmt.Errorf("upload failed: %v", errMessage)
-	}
-
-	obj = obj["Result"].(map[string]interface{})
-	pluginResult, ok := obj["PluginResult"].([]interface{})
-	if !ok {
-		return "", errors.New("upload failed")
-	}
-
-	info := pluginResult[0].(map[string]interface{})
-	return info["ImageUri"].(string), nil
-}
+//// 文件上传
+//func (c *Chat) Upload(ctx context.Context, file string) (string, error) {
+//	// 啰里八嗦的代码，狗看了都摇头
+//	retry := 3
+//label:
+//	retry--
+//	{
+//		msToken, err := c.reportMsToken()
+//		if err != nil {
+//			return "", err
+//		}
+//		c.msToken = msToken
+//	}
+//
+//	payload := map[string]string{
+//		"scene": "bot_task",
+//	}
+//	bogus, signature, err := c.sign("", payload)
+//	if err != nil {
+//		return "", err
+//	}
+//
+//	fileBytes, err := os.ReadFile(file)
+//	if err != nil {
+//		return "", err
+//	}
+//
+//	// 1. 下载凭证
+//	response, err := emit.ClientBuilder(c.session).
+//		Proxies(c.opts.proxies).
+//		Context(ctx).
+//		Option(c.connOpts).
+//		POST("https://www.coze.com/api/playground/upload/auth_token").
+//		Query("msToken", c.msToken).
+//		Query("X-Bogus", bogus).
+//		Query("_signature", signature).
+//		Header("origin", "https://www.coze.com").
+//		Header("referer", "https://www.coze.com/").
+//		Header("cookie", c.makeCookie()).
+//		Header("user-agent", userAgent).
+//		JSONHeader().
+//		Body(payload).
+//		DoS(http.StatusOK)
+//	if err != nil {
+//		return "", err
+//	}
+//
+//	obj, err := emit.ToMap(response)
+//	_ = response.Body.Close()
+//	if err != nil {
+//		return "", err
+//	}
+//	if code, ok := obj["code"]; !ok || code.(float64) != 0 {
+//		return "", fmt.Errorf("upload failed: %s", obj["msg"])
+//	}
+//	obj = obj["data"].(map[string]interface{})
+//	serviceId := obj["service_id"].(string)
+//	host := obj["upload_host"].(string)
+//	auth := obj["auth"].(map[string]interface{})
+//	fileExt := ".txt"
+//	if ext := filepath.Ext(file); ext != "" {
+//		fileExt = ext
+//	}
+//
+//	// 2.1 签名
+//	url, headers, err := c.uploadSign(ctx, struct {
+//		method          string
+//		sessionToken    string
+//		accessKeyId     string
+//		secretAccessKey string
+//		host            string
+//		serviceId       string
+//		headers         map[string]interface{}
+//		params          map[string]interface{}
+//		body            map[string]interface{}
+//	}{
+//		method:          "GET",
+//		sessionToken:    auth["session_token"].(string),
+//		accessKeyId:     auth["access_key_id"].(string),
+//		secretAccessKey: auth["secret_access_key"].(string),
+//		host:            host,
+//		serviceId:       serviceId,
+//		params: map[string]interface{}{
+//			"Action":        "ApplyImageUpload",
+//			"ServiceId":     serviceId,
+//			"FileSize":      len(fileBytes),
+//			"FileExtension": fileExt,
+//		},
+//	})
+//	if err != nil {
+//		return "", err
+//	}
+//
+//	// 2.2 ApplyImageUpload
+//	response, err = emit.ClientBuilder(c.session).
+//		Proxies(c.opts.proxies).
+//		Context(ctx).
+//		Option(c.connOpts).
+//		GET(url).
+//		Header("origin", "https://www.coze.com").
+//		Header("referer", "https://www.coze.com/").
+//		Header("X-Amz-Date", headers["X-Amz-Date"].(string)).
+//		Header("x-amz-security-token", headers["x-amz-security-token"].(string)).
+//		Header("Authorization", headers["Authorization"].(string)).
+//		Header("user-agent", userAgent).
+//		DoC(emit.Status(http.StatusOK), emit.IsJSON)
+//	if err != nil {
+//		return "", err
+//	}
+//
+//	obj, err = emit.ToMap(response)
+//	_ = response.Body.Close()
+//	if err != nil {
+//		return "", err
+//	}
+//
+//	if _, ok := obj["Result"]; !ok {
+//		if retry > 0 {
+//			goto label
+//		}
+//		errMessage := obj["ResponseMetadata"].(map[string]interface{})["Error"]
+//		return "", fmt.Errorf("upload failed: %v", errMessage)
+//	}
+//
+//	obj = obj["Result"].(map[string]interface{})
+//	uploadAddress := obj["InnerUploadAddress"].(map[string]interface{})
+//	uploadAddress = uploadAddress["UploadNodes"].([]interface{})[0].(map[string]interface{})
+//	storeInfo := uploadAddress["StoreInfos"].([]interface{})[0].(map[string]interface{})
+//
+//	// 3 上传文件
+//	ieee := fmt.Sprintf("%x", crc32.ChecksumIEEE(fileBytes))
+//	url = fmt.Sprintf("https://%s/upload/v1/%s", uploadAddress["UploadHost"], storeInfo["StoreUri"])
+//	response, err = emit.ClientBuilder(c.session).
+//		Proxies(c.opts.proxies).
+//		Context(ctx).
+//		Option(c.connOpts).
+//		POST(url).
+//		Header("origin", "https://www.coze.com").
+//		Header("referer", "https://www.coze.com/").
+//		Header("Authorization", storeInfo["Auth"].(string)).
+//		Header("Content-Crc32", ieee).
+//		Header("Content-Type", "application/octet-stream").
+//		Header("Content-Disposition", "attachment; filename=\"undefined\"").
+//		//Header("X-Storage-U", "7353045591632774160").
+//		Header("user-agent", userAgent).
+//		Bytes(fileBytes).
+//		DoC(emit.Status(http.StatusOK), emit.IsJSON)
+//	if err != nil {
+//		return "", err
+//	}
+//
+//	obj, err = emit.ToMap(response)
+//	_ = response.Body.Close()
+//	if err != nil {
+//		return "", err
+//	}
+//
+//	// throw error:  Mismatch CRC32 ???
+//	if code, ok := obj["code"]; !ok || code.(float64) != 2000 {
+//		return "", fmt.Errorf("upload failed: %s", obj["message"])
+//	}
+//
+//	// 4.1 签名
+//	url, headers, err = c.uploadSign(ctx, struct {
+//		method          string
+//		sessionToken    string
+//		accessKeyId     string
+//		secretAccessKey string
+//		host            string
+//		serviceId       string
+//		headers         map[string]interface{}
+//		params          map[string]interface{}
+//		body            map[string]interface{}
+//	}{
+//		method:          "POST",
+//		sessionToken:    auth["session_token"].(string),
+//		accessKeyId:     auth["access_key_id"].(string),
+//		secretAccessKey: auth["secret_access_key"].(string),
+//		host:            host,
+//		serviceId:       serviceId,
+//		headers: map[string]interface{}{
+//			"Content-Type": "application/json",
+//		},
+//		params: map[string]interface{}{
+//			"Action":    "CommitImageUpload",
+//			"ServiceId": serviceId,
+//		},
+//		body: map[string]interface{}{
+//			"SessionKey": uploadAddress["SessionKey"],
+//		},
+//	})
+//
+//	// 4.2 CommitImageUpload
+//	response, err = emit.ClientBuilder(c.session).
+//		Proxies(c.opts.proxies).
+//		Context(ctx).
+//		Option(c.connOpts).
+//		POST(url).
+//		Header("origin", "https://www.coze.com").
+//		Header("referer", "https://www.coze.com/").
+//		Header("X-Amz-Date", headers["X-Amz-Date"].(string)).
+//		Header("X-Amz-Content-Sha256", headers["X-Amz-Content-Sha256"].(string)).
+//		Header("x-amz-security-token", headers["x-amz-security-token"].(string)).
+//		Header("Authorization", headers["Authorization"].(string)).
+//		Header("user-agent", userAgent).
+//		JSONHeader().
+//		Body(map[string]interface{}{
+//			"SessionKey": uploadAddress["SessionKey"],
+//		}).
+//		DoC(emit.Status(http.StatusOK), emit.IsJSON)
+//	if err != nil {
+//		return "", err
+//	}
+//
+//	obj, err = emit.ToMap(response)
+//	_ = response.Body.Close()
+//	if err != nil {
+//		return "", err
+//	}
+//
+//	if _, ok := obj["Result"]; !ok {
+//		if retry > 0 {
+//			goto label
+//		}
+//		errMessage := obj["ResponseMetadata"].(map[string]interface{})["Error"]
+//		return "", fmt.Errorf("upload failed: %v", errMessage)
+//	}
+//
+//	obj = obj["Result"].(map[string]interface{})
+//	pluginResult, ok := obj["PluginResult"].([]interface{})
+//	if !ok {
+//		return "", errors.New("upload failed")
+//	}
+//
+//	info := pluginResult[0].(map[string]interface{})
+//	return info["ImageUri"].(string), nil
+//}
 
 func (c *Chat) makeCookie() (cookie string) {
 	var cookies []string
@@ -1073,91 +1066,90 @@ func (c *Chat) makeWebSdkPayload(ctx context.Context, t MessageType, histories [
 	return data, nil
 }
 
-func (c *Chat) uploadSign(ctx context.Context, auth struct {
-	method          string
-	sessionToken    string
-	accessKeyId     string
-	secretAccessKey string
-	host            string
-	serviceId       string
-	headers         map[string]interface{}
-	params          map[string]interface{}
-	body            map[string]interface{}
-}) (url string, headers map[string]interface{}, err error) {
-	var query string
-	var action string
-	for k, v := range auth.params {
-		if k == "Action" {
-			action = v.(string)
-		}
-		query += fmt.Sprintf("%s=%v&", k, v)
-	}
-	if query == "" {
-		return "", nil, errors.New("empty auth.params")
-	}
-	if action == "" {
-		return "", nil, errors.New("empty action")
-	}
-
-	query += "Version=2018-08-01"
-	auth.params["Version"] = "2018-08-01"
-	obj := map[string]interface{}{
-		"method":   auth.method,
-		"url":      "https://" + auth.host + "/?" + query,
-		"timeout":  30000,
-		"pathname": "/",
-		"region":   "ap-singapore-1",
-		"params":   auth.params,
-	}
-
-	if auth.headers != nil {
-		obj["headers"] = auth.headers
-	}
-
-	if auth.body != nil {
-		bodyBytes, _ := json.Marshal(auth.body)
-		obj["custom"] = string(bodyBytes)
-		obj["body"] = auth.body
-	}
-
-	response, err := emit.ClientBuilder(c.session).
-		//Proxies(c.opts.proxies).
-		Context(ctx).
-		Option(c.connOpts).
-		POST(SignURL+"/upload-sign").
-		Query("mime", "imagex").
-		Query("accessKeyId", auth.accessKeyId).
-		Query("secretAccessKey", auth.secretAccessKey).
-		Query("sessionToken", auth.sessionToken).
-		JSONHeader().
-		Body(obj).
-		DoS(http.StatusOK)
-	if err != nil {
-		return
-	}
-
-	obj, err = emit.ToMap(response)
-	_ = response.Body.Close()
-	if err != nil {
-		return
-	}
-
-	if o, ok := obj["ok"]; !ok || !reflect.DeepEqual(o, true) {
-		return "", nil, fmt.Errorf("upload sign failed: %s", obj["msg"])
-	}
-
-	obj = obj["data"].(map[string]interface{})
-	request := obj["request"].(map[string]interface{})
-	headers = request["headers"].(map[string]interface{})
-	url = strings.Replace(request["url"].(string), ".com/?", ".com?", -1)
-	return
-}
+//func (c *Chat) uploadSign(ctx context.Context, auth struct {
+//	method          string
+//	sessionToken    string
+//	accessKeyId     string
+//	secretAccessKey string
+//	host            string
+//	serviceId       string
+//	headers         map[string]interface{}
+//	params          map[string]interface{}
+//	body            map[string]interface{}
+//}) (url string, headers map[string]interface{}, err error) {
+//	var query string
+//	var action string
+//	for k, v := range auth.params {
+//		if k == "Action" {
+//			action = v.(string)
+//		}
+//		query += fmt.Sprintf("%s=%v&", k, v)
+//	}
+//	if query == "" {
+//		return "", nil, errors.New("empty auth.params")
+//	}
+//	if action == "" {
+//		return "", nil, errors.New("empty action")
+//	}
+//
+//	query += "Version=2018-08-01"
+//	auth.params["Version"] = "2018-08-01"
+//	obj := map[string]interface{}{
+//		"method":   auth.method,
+//		"url":      "https://" + auth.host + "/?" + query,
+//		"timeout":  30000,
+//		"pathname": "/",
+//		"region":   "ap-singapore-1",
+//		"params":   auth.params,
+//	}
+//
+//	if auth.headers != nil {
+//		obj["headers"] = auth.headers
+//	}
+//
+//	if auth.body != nil {
+//		bodyBytes, _ := json.Marshal(auth.body)
+//		obj["custom"] = string(bodyBytes)
+//		obj["body"] = auth.body
+//	}
+//
+//	response, err := emit.ClientBuilder(c.session).
+//		//Proxies(c.opts.proxies).
+//		Context(ctx).
+//		Option(c.connOpts).
+//		POST(SignURL+"/upload-sign").
+//		Query("mime", "imagex").
+//		Query("accessKeyId", auth.accessKeyId).
+//		Query("secretAccessKey", auth.secretAccessKey).
+//		Query("sessionToken", auth.sessionToken).
+//		JSONHeader().
+//		Body(obj).
+//		DoS(http.StatusOK)
+//	if err != nil {
+//		return
+//	}
+//
+//	obj, err = emit.ToMap(response)
+//	_ = response.Body.Close()
+//	if err != nil {
+//		return
+//	}
+//
+//	if o, ok := obj["ok"]; !ok || !reflect.DeepEqual(o, true) {
+//		return "", nil, fmt.Errorf("upload sign failed: %s", obj["msg"])
+//	}
+//
+//	obj = obj["data"].(map[string]interface{})
+//	request := obj["request"].(map[string]interface{})
+//	headers = request["headers"].(map[string]interface{})
+//	url = strings.Replace(request["url"].(string), ".com/?", ".com?", -1)
+//	return
+//}
 
 // bogus: X-Bogus
 // signature: _signature
-func (c *Chat) sign(uri string, payload interface{}) (string, string, error) {
+func (c *Chat) sign(uri string, payload interface{}) (bogus string, signature string, err error) {
 	response, err := emit.ClientBuilder(c.session).
-		//Proxies(proxies).
 		Option(c.connOpts).
 		POST(SignURL).
 		Query("msToken", c.msToken).
@@ -1166,28 +1158,29 @@ func (c *Chat) sign(uri string, payload interface{}) (string, string, error) {
 		Body(payload).
 		DoS(http.StatusOK)
 	if err != nil {
-		return "", "", fmt.Errorf("coze-sign: %v", err)
+		err = fmt.Errorf("coze-sign: %v", err)
+		return
 	}
 
 	defer response.Body.Close()
 	var res signResponse[map[string]interface{}]
 	if err = emit.ToObject(response, &res); err != nil {
-		return "", "", fmt.Errorf("coze-sign: %s", err)
+		err = fmt.Errorf("coze-sign: %s", err)
+		return
 	}
 
 	if !res.Ok {
-		return "", "", fmt.Errorf("coze-sign: %s", res.Msg)
+		err = fmt.Errorf("coze-sign: %s", res.Msg)
+		return
 	}
 
-	bogus := res.Data["bogus"].(string)
-	signature := res.Data["signature"].(string)
-	// fmt.Printf("sign success: bogus [%s], signature[%s]\n", bogus, signature)
-	return bogus, signature, nil
+	bogus = res.Data["bogus"].(string)
+	signature = res.Data["signature"].(string)
+	return
 }
 
 func (c *Chat) reportMsToken() (string, error) {
 	response, err := emit.ClientBuilder(c.session).
-		//Proxies(c.opts.proxies).
 		Option(c.connOpts).
 		GET(SignURL + "/report").
 		DoS(http.StatusOK)
@@ -1634,4 +1627,14 @@ func isClaude(model string) bool {
 		model == ModelClaude3Haiku_200k ||
 		model == modelMap[ModelClaude35Sonnet_200k] ||
 		model == modelMap[ModelClaude3Haiku_200k]
+}
+
+func genMsToken() string {
+	buf := new(bytes.Buffer)
+	str := "ABCDEFGHIGKLMNOPQRSTUVWXYZabcdefghigklmnopqrstuvwxyz0123456789="
+	for i := 0; i < 107; i++ {
+		b := str[rand.Intn(len(str)-1)]
+		buf.WriteByte(b)
+	}
+	return buf.String()
 }

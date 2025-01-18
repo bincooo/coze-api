@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	cookie  = ""
+	cookie  = "msToken=4QvzbIcdTA9f5TrBFlGBKfMgV12n4fjTRHdd1cruOibwopv6BTbDFL9loPexdn2baKNF_eLgijXZ3VTUO7f0snS_RySH8Yfr9J7MJLkhTdaAMS6Q6COnM7zQR29hHg==; msToken=4QvzbIcdTA9f5TrBFlGBKfMgV12n4fjTRHdd1cruOibwopv6BTbDFL9loPexdn2baKNF_eLgijXZ3VTUO7f0snS_RySH8Yfr9J7MJLkhTdaAMS6Q6COnM7zQR29hHg==; i18next=en; ttwid=1%7CZMQxp1EFgx4fuKu--p-15nkXczXljduJSLy1ZO2jk6Y%7C1736469244%7C974e980f9ea49684fe284d9fa0e68ab6675eb2997d2fa67149ab317f5bf9aea9; s_v_web_id=verify_m5manxwh_QNJogX0e_iSXf_4JrK_81RB_Y89Dpkhlhb9J; odin_tt=32aef92ad466e336ef26f6fe2513d86da7071cfdc1ba9d4f533bb98f4e45d2f1e661f34305151736804b641dcf80ba8c47ea34045a5c41cd50fcf01abbf4753d; passport_csrf_token=1bde4ec8a179c656122892c75fafacc4; passport_csrf_token_default=1bde4ec8a179c656122892c75fafacc4; sessionid=5a9aa493d052986dd08ca64299125099; sessionid_ss=5a9aa493d052986dd08ca64299125099; sid_guard=5a9aa493d052986dd08ca64299125099%7C1733288798%7C5184000%7CSun%2C+02-Feb-2025+05%3A06%3A38+GMT; sid_tt=5a9aa493d052986dd08ca64299125099; sid_ucp_v1=1.0.0-KDc2Y2M1OGE0NzQ4NWExMGYzNzgzMjA2YWY5NjZlNjYzYzhmOGNhNWUKIAiRiKra0dfixGYQ3sa_ugYY1J0fIAww-pWmtAY4CEASEAMaBm1hbGl2YSIgNWE5YWE0OTNkMDUyOTg2ZGQwOGNhNjQyOTkxMjUwOTk; ssid_ucp_v1=1.0.0-KDc2Y2M1OGE0NzQ4NWExMGYzNzgzMjA2YWY5NjZlNjYzYzhmOGNhNWUKIAiRiKra0dfixGYQ3sa_ugYY1J0fIAww-pWmtAY4CEASEAMaBm1hbGl2YSIgNWE5YWE0OTNkMDUyOTg2ZGQwOGNhNjQyOTkxMjUwOTk; store-country-code=jp; store-country-code-src=uid; store-idc=maliva; uid_tt=3be5481e5343a2668290910c62f79cdabbe47e4e3501daea8fbd75ae2368a93c; uid_tt_ss=3be5481e5343a2668290910c62f79cdabbe47e4e3501daea8fbd75ae2368a93c"
 	msToken = ""
 )
 
@@ -179,30 +179,30 @@ func TestImages(t *testing.T) {
 	t.Log(image)
 }
 
-func TestUpload(t *testing.T) {
-	options := NewDefaultOptions("7372269419617697810", "1716490929018", 2, false, "http://127.0.0.1:7890")
-	chat := New(cookie, msToken, options)
-	timeout, cancel := context.WithTimeout(context.Background(), 120*time.Second)
-	defer cancel()
-
-	file, err := chat.Upload(timeout, "/Users/bincooo/Desktop/blob.jpg")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	t.Log(file)
-	message, err := FilesMessage("图里有什么", file)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ch, err := chat.Reply(timeout, Mix, message)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	echo(ch, t, true)
-}
+//func TestUpload(t *testing.T) {
+//	options := NewDefaultOptions("7372269419617697810", "1716490929018", 2, false, "http://127.0.0.1:7890")
+//	chat := New(cookie, msToken, options)
+//	timeout, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+//	defer cancel()
+//
+//	file, err := chat.Upload(timeout, "/Users/bincooo/Desktop/blob.jpg")
+//	if err != nil {
+//		t.Fatal(err)
+//	}
+//
+//	t.Log(file)
+//	message, err := FilesMessage("图里有什么", file)
+//	if err != nil {
+//		t.Fatal(err)
+//	}
+//
+//	ch, err := chat.Reply(timeout, Mix, message)
+//	if err != nil {
+//		t.Fatal(err)
+//	}
+//
+//	echo(ch, t, true)
+//}
 
 func TestDraftBot(t *testing.T) {
 	options := NewDefaultOptions("7372269419617697810", "7353038106104528914", 4, true, "http://127.0.0.1:7890")

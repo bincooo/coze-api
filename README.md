@@ -5,6 +5,10 @@
 [https://github.com/bincooo/chatgpt-adapter](https://github.com/bincooo/chatgpt-adapter/tree/v2)
 
 
+#### 签名服务自搭
+
+[coze-helper](https://github.com/bincooo/coze-helper) 哪位大神，别打我hf上的签名服务了
+
 #### 限制
 ```tex
 Regarding message limits, currently the message limits on Coze are:

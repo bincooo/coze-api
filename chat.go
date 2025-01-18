@@ -103,11 +103,6 @@ func (c *Chat) Reply(ctx context.Context, t MessageType, query string) (chan str
 	}
 
 	if c.msToken == "" {
-		//msToken, err := c.reportMsToken()
-		//if err != nil {
-		//	return nil, err
-		//}
-		//c.msToken = msToken
 		c.msToken = genMsToken()
 	}
 
@@ -150,11 +145,7 @@ func (c *Chat) Reply(ctx context.Context, t MessageType, query string) (chan str
 
 func (c *Chat) replyWebSdk(ctx context.Context, t MessageType, histories []interface{}, query string) (chan string, error) {
 	if c.msToken == "" {
-		msToken, err := c.reportMsToken()
-		if err != nil {
-			return nil, err
-		}
-		c.msToken = msToken
+		c.msToken = genMsToken()
 	}
 
 	payload, err := c.makeWebSdkPayload(ctx, t, histories, query)
@@ -200,11 +191,7 @@ func (c *Chat) replyWebSdk(ctx context.Context, t MessageType, histories []inter
 // 获取bots
 func (c *Chat) QueryBots(ctx context.Context) ([]interface{}, error) {
 	if c.msToken == "" {
-		msToken, err := c.reportMsToken()
-		if err != nil {
-			return nil, err
-		}
-		c.msToken = msToken
+		c.msToken = genMsToken()
 	}
 	space, err := c.GetSpace(ctx)
 	if err != nil {
@@ -259,11 +246,7 @@ func (c *Chat) QueryBots(ctx context.Context) ([]interface{}, error) {
 // 创建bot
 func (c *Chat) Create(ctx context.Context, name string) (botId string, err error) {
 	if c.msToken == "" {
-		msToken, err := c.reportMsToken()
-		if err != nil {
-			return "", err
-		}
-		c.msToken = msToken
+		c.msToken = genMsToken()
 	}
 	space, err := c.GetSpace(ctx)
 	if err != nil {
@@ -316,11 +299,7 @@ func (c *Chat) Create(ctx context.Context, name string) (botId string, err error
 // 发布bot
 func (c *Chat) Publish(ctx context.Context, botId string, connectors map[string]interface{}) error {
 	if c.msToken == "" {
-		msToken, err := c.reportMsToken()
-		if err != nil {
-			return err
-		}
-		c.msToken = msToken
+		c.msToken = genMsToken()
 	}
 	space, err := c.GetSpace(ctx)
 	if err != nil {
@@ -375,11 +354,7 @@ func (c *Chat) QueryWebSdkCredits(ctx context.Context) (int, error) {
 		Add(-time.Second)
 
 	if c.msToken == "" {
-		msToken, err := c.reportMsToken()
-		if err != nil {
-			return 0, err
-		}
-		c.msToken = msToken
+		c.msToken = genMsToken()
 	}
 
 	response, err := emit.ClientBuilder(c.session).
@@ -453,11 +428,7 @@ retry:
 
 func (c *Chat) Images(ctx context.Context, prompt string) (string, error) {
 	if c.msToken == "" {
-		msToken, err := c.reportMsToken()
-		if err != nil {
-			return "", err
-		}
-		c.msToken = msToken
+		c.msToken = genMsToken()
 	}
 
 	conversationId, err := c.getCon()
@@ -1179,54 +1150,54 @@ func (c *Chat) sign(uri string, payload interface{}) (bogus string, signature st
 	return
 }
 
-func (c *Chat) reportMsToken() (string, error) {
-	response, err := emit.ClientBuilder(c.session).
-		Option(c.connOpts).
-		GET(SignURL + "/report").
-		DoS(http.StatusOK)
-	if err != nil {
-		return "", err
-	}
-
-	var res signResponse[map[string]interface{}]
-	err = emit.ToObject(response, &res)
-	_ = response.Body.Close()
-	if err != nil {
-		return "", err
-	}
-
-	if !res.Ok {
-		return "", errors.New("refresh msToken failed")
-	}
-
-	u := res.Data["url"]
-	if c.webSdk {
-		u = "https://mssdk-i18n-sg.ciciai.com"
-	}
-
-	delete(res.Data, "url")
-	response, err = emit.ClientBuilder(c.session).
-		Proxies(c.opts.proxies).
-		Option(c.connOpts).
-		POST(fmt.Sprintf("%s/web/report", u)).
-		Query("msToken", c.msToken).
-		JSONHeader().
-		Body(res.Data).
-		DoS(http.StatusOK)
-	if err != nil {
-		return "", err
-	}
-
-	logrus.Infof("%s", emit.TextResponse(response))
-	_ = response.Body.Close()
-
-	cookie := emit.GetCookie(response, "msToken")
-	if cookie == "" {
-		return cookie, errors.New("refresh msToken failed")
-	}
-	// fmt.Printf("msToken success: %s\n", cookie)
-	return cookie, nil
-}
+//func (c *Chat) reportMsToken() (string, error) {
+//	response, err := emit.ClientBuilder(c.session).
+//		Option(c.connOpts).
+//		GET(SignURL + "/report").
+//		DoS(http.StatusOK)
+//	if err != nil {
+//		return "", err
+//	}
+//
+//	var res signResponse[map[string]interface{}]
+//	err = emit.ToObject(response, &res)
+//	_ = response.Body.Close()
+//	if err != nil {
+//		return "", err
+//	}
+//
+//	if !res.Ok {
+//		return "", errors.New("refresh msToken failed")
+//	}
+//
+//	u := res.Data["url"]
+//	if c.webSdk {
+//		u = "https://mssdk-i18n-sg.ciciai.com"
+//	}
+//
+//	delete(res.Data, "url")
+//	response, err = emit.ClientBuilder(c.session).
+//		Proxies(c.opts.proxies).
+//		Option(c.connOpts).
+//		POST(fmt.Sprintf("%s/web/report", u)).
+//		Query("msToken", c.msToken).
+//		JSONHeader().
+//		Body(res.Data).
+//		DoS(http.StatusOK)
+//	if err != nil {
+//		return "", err
+//	}
+//
+//	logrus.Infof("%s", emit.TextResponse(response))
+//	_ = response.Body.Close()
+//
+//	cookie := emit.GetCookie(response, "msToken")
+//	if cookie == "" {
+//		return cookie, errors.New("refresh msToken failed")
+//	}
+//	// fmt.Printf("msToken success: %s\n", cookie)
+//	return cookie, nil
+//}
 
 func (c *Chat) GetSpace(ctx context.Context) (space string, err error) {
 	if c.space != "" {
